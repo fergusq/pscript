@@ -1,0 +1,20 @@
+extern Int[] malloc(Int i);
+extern Void printf(Str s, Int i);
+
+Void print(Int i) { printf("%d\n", i); }
+
+Int[] fromTo(Int from, Int to) {
+	var arr = malloc(to-from+1);
+	arr[0-1] = to-from+1;
+	var i = 0;
+	for (a in arr) {
+		arr[i] = from+i;
+		i = i + 1;
+	}
+	return arr;
+}
+
+Void main() {
+	var arr = fromTo(1, 10);
+	for (i in arr) print(i*2);
+}
