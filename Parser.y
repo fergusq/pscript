@@ -14,6 +14,7 @@ import Lexer
 	if		{ TokenIf }
 	else		{ TokenElse }
 	return		{ TokenReturn }
+	extern		{ TokenExtern }
 	int		{ TokenInt $$ }
 	str		{ TokenString $$ }
 	var		{ TokenVarname $$ }
@@ -37,6 +38,8 @@ import Lexer
 	neq		{ TokenNeq }
 	le		{ TokenLe }
 	ge		{ TokenGe }
+	and		{ TokenAnd }
+	or		{ TokenOr }
 
 %%
 
@@ -44,9 +47,14 @@ Prog	: Decl Prog			{ ($1 : $2) }
 	| Decl				{ [$1] }
 
 Decl	: Func				{ $1 }
+	| ExternFunc			{ $1 }
 
-Func	: Datatype var '(' Params ')' Stmt { Function { name = $2, parameters = $4, returnType = $1, body = $6 } }
-Func	: Datatype var '(' ')' Stmt	{ Function { name = $2, parameters = [], returnType = $1, body = $5 } }
+Func	: Datatype var '(' Params ')' Stmt		{ Function { name = $2, parameters = $4, returnType = $1, body = $6 } }
+	| Datatype var '(' ')' Stmt			{ Function { name = $2, parameters = [], returnType = $1, body = $5 } }
+
+ExternFunc
+	: extern Datatype var '(' Params ')' ';'	{ Function { name = $3, parameters = $5, returnType = $2, body = Extern } }
+	| extern Datatype var '(' ')' ';'		{ Function { name = $3, parameters = [], returnType = $2, body = Extern } }
 
 Params	: Parameter ',' Params		{ ($1 : $3) }
 	| Parameter			{ [$1] }
@@ -83,7 +91,13 @@ Call	: Preprim '(' Args ')'		{ Call $1 $3 }
 Args	: Exp ',' Args			{ ($1 : $3) }
 	| Exp				{ [$1] }
 
-Exp	: Cmp1				{ $1 }
+Exp	: Logic1			{ $1 }
+
+Logic1	: Logic1 or Logic2		{ MethodCall $1 "||" [$3] }
+	| Logic2			{ $1 }
+
+Logic2	: Logic2 and Cmp1		{ MethodCall $1 "&&" [$3] }
+	| Cmp1				{ $1 }
 
 Cmp1	: Cmp1 eq Cmp2			{ MethodCall $1 "==" [$3] }
 	| Cmp1 neq Cmp2			{ MethodCall $1 "!=" [$3] }
@@ -133,6 +147,7 @@ data Statement
 	| For String Expression Statement
 	| If Expression Statement (Maybe Statement)
 	| Return Expression
+	| Extern
 	deriving Show
 
 data Expression

@@ -33,23 +33,23 @@ dt2pdt (Typename name _) = PReference name
 
 ctype :: PDatatype -> String -> String
 ctype (PList a) n = ctype a ('*':n)
-ctype (PFunction r ps) n = ctype r (n ++ "(" ++ cparams ps ++ ")")
+ctype (PFunction r ps) n = ctype r ("(*" ++ n ++ ")(" ++ cparams ps ++ ")")
 ctype PInteger n = "int " ++ n
 ctype PBool n = "int " ++ n
 ctype PString n = "char*" ++ n
-ctype PVoid n = "void " ++ n
+ctype PVoid n = "char " ++ n
 ctype PNothing n = "void " ++ n
 ctype (PReference a) n = "struct " ++ a ++ ('*':n)
 
 cparams :: [PDatatype] -> String
 cparams [] = ""
 cparams [a] = ctype a ""
-cparams (a:as) = ctype a "" ++ cparams as
+cparams (a:as) = ctype a "" ++ ", " ++ cparams as
 
 -- Validaattori käyttää nykyisen muuttujaympäristön määrittelemiseen Map-oliota
 -- Mahdolliset virheet kirjoitetaan String-Writeriin
 
-type Generator = WriterT [String] (Writer [String])
+type Generator = WriterT [String] (WriterT [String] (Writer [String]))
 type Compiler a = StateT Scope Generator a
 
 data Scope = Scope {
@@ -139,11 +139,31 @@ generateCode :: String -> Generator()
 generateCode code
     = tell [code]
 
+generateVarHeader :: PDatatype -> String -> Generator ()
+generateVarHeader dt name
+    = lift $ tell [ctype dt name ++ ";\n"]
+
+generateFunctionHeader :: PDatatype -> [PDatatype] -> String -> Generator ()
+generateFunctionHeader r ps name
+    = lift $ tell [ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
+
+generateExternHeader :: PDatatype -> String -> Generator ()
+generateExternHeader dt name
+    = lift $ tell ["extern " ++ ctype dt name ++ ";\n"]
+
+generateExternFunctionHeader :: PDatatype -> [PDatatype] -> String -> Generator ()
+generateExternFunctionHeader r ps name
+    = lift $ tell ["extern " ++ ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
+
+generateHeaderCode :: String -> Generator ()
+generateHeaderCode code
+    = lift $ tell [code]
+
 -- Apufunktioita tyyppien tarkistamiseen ja virheisiin
 
 tellError :: String -> Compiler ()
 tellError msg = do fname <- getCurrentFunctionName
-                   lift . lift $ tell ["Error in " ++ fname ++ ": " ++ msg]
+                   lift . lift . lift $ tell ["Error in " ++ fname ++ ": " ++ msg]
 
 typemismatch :: PDatatype -> PDatatype -> Compiler ()
 typemismatch right wrong
@@ -168,26 +188,32 @@ checkargs paramTs args = if length paramTs /= length args
 
 -- Pääfunktio
 
-compile :: [Declaration] -> WriterT [String] (Writer [String]) ()
+compile :: [Declaration] -> Generator ()
 compile decls = do let pvars = map decl2pvar decls
                    mapM_ (compileDecl pvars) decls
 
 -- Kääntää yksittäisen funktion
 
-compileDecl :: [PVariable] -> Declaration -> WriterT [String] (Writer [String]) ()
+compileDecl :: [PVariable] -> Declaration -> Generator ()
+compileDecl pvars decl@Function { name = fname, parameters = params,
+                                  returnType=rtype, body = Extern }
+    = do generateExternFunctionHeader (dt2pdt rtype) [] fname
+         return ()
 compileDecl pvars decl =
     let fname = name decl
         params = map (\(n,d) -> (n,dt2pdt d)) (parameters decl)
         rtype = dt2pdt $ returnType decl
         scope = Scope {
-        functionName = fname,
-        variables = Map.fromList $ pvars ++ params,
-        expectedReturnType = rtype,
-        counter = 0
-    } in do generateFunction rtype fname params
-            runStateT (compileStatement $ body decl) scope
-            generateEnd
-            return ()
+            functionName = fname,
+            variables = Map.fromList $ pvars ++ params,
+            expectedReturnType = rtype,
+            counter = 0
+        }
+    in do generateFunctionHeader rtype (map snd params) fname
+          generateFunction rtype fname params
+          runStateT (compileStatement $ body decl) scope
+          generateEnd
+          return ()
 
 -- Lauseiden kääntäjät
 
@@ -200,7 +226,9 @@ compileStatement (Create name expr)
     = do dt <- compileExpression name expr
          putVar name dt
 compileStatement (Assign name expr)
-    = do vt <- compileExpression name expr
+    = do var <- tmpVar
+         vt <- compileExpression var expr
+         lift $ generateAssign name var
          dt <- getVarOrError name
          checktype dt vt
 compileStatement (If expr thenBody elseBody)
@@ -223,12 +251,22 @@ compileStatement (For name expr body)
          case dt of
             PList dt' -> do scope <- get
                             putVar name dt'
-                            lift $ generateCreate dt' name (var++"["++ctr++"]")
+                            lift $ generateCreate dt' name (var++"["++ctr++"+1]")
                             compileStatement body
                             lift $ generateAssign ctr (ctr ++ "+1")
                             put scope
             _         -> typemismatch (PList PNothing) dt
          lift generateEnd
+compileStatement (Expr (Call expr args))
+    = do var <- tmpVar
+         dt <- compileExpression var expr
+         case dt of
+            PFunction retType paramTypes
+                -> do argcodes <- checkargs paramTypes args
+                      lift $ generateCode (var++"("++joinColon argcodes++");\n")
+                      return ()
+            _ -> do typemismatch (PFunction PNothing []) dt
+                    return ()
 compileStatement (Expr expr)
     = do var <- tmpVar
          compileExpression var expr
@@ -245,7 +283,7 @@ compileStatement (Return expr)
 compileExpression :: String -> Expression -> Compiler PDatatype
 compileExpression v (Int i) = do lift $ generateCreate PInteger v (show i)
                                  return PInteger
-compileExpression v (Str s) = do lift $ generateCreate PString v s
+compileExpression v (Str s) = do lift $ generateCreate PString v (show s)
                                  return PString
 compileExpression v (Var name)
     = do dt <- getVarOrError name
@@ -267,11 +305,12 @@ compileExpression v (List (expr:exprs))
                                           -- tyypin selvittämiseksi
          lift $ generateCreate (PList dt) v ("malloc("++show (length exprs + 1)
                                              ++ "*sizeof(" ++ ctype dt ""++ "))")
-         lift $ generateAssign (v++"[0]") var
+         lift $ generateAssign (v++"[0]") (show $ length exprs + 1)
+         lift $ generateAssign (v++"[1]") var
          mapM_ (\(i,val) -> do var' <- tmpVar
                                vt <- compileExpression var' val
                                checktype dt vt
-                               lift $ generateAssign (v++"["++show i++"]") var'
+                               lift $ generateAssign (v++"["++show (i+1)++"]") var'
                ) (zip [1..length exprs] exprs)
          return (PList dt)
 compileExpression v (MethodCall obj method args)
@@ -302,6 +341,17 @@ compileMethodCall v obj PInteger method args
              lift $ generateCreate PInteger v (obj++method++var)
              return PBool
 
+-- PList
+compileMethodCall v obj (PList dt) method args
+    | method == "[]"
+        = do (index:vars) <- checkargs [PInteger] args
+             lift $ generateCreate dt v (obj++"["++index++"+1]")
+             return dt
+    | method == "[]="
+        = do (index:value:vars) <- checkargs [PInteger, dt] args
+             lift $ generateAssign (obj++"["++index++"+1]") value
+             lift $ generateCreate dt v value
+             return dt
 -- Määrittelemättömät metodit
 compileMethodCall v obj dt method args
     = do tellError ("type " ++ show dt ++ " does not have method `" ++ method ++ "'")
@@ -312,7 +362,9 @@ compileMethodCall v obj dt method args
 main = do c <- getContents
           let lexemes = lexer c
           let tree = parsePScript lexemes
-          let ((_, code), errors) = runWriter $ runWriterT $ compile tree
+          let (((_, code), header), errors) =
+                runWriter $ runWriterT $ runWriterT $ compile tree
+          forM_ header putStr
           forM_ code putStr
           forM_ errors putStrLn
           putStrLn ""

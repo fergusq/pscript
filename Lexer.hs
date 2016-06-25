@@ -8,6 +8,7 @@ data Token
 	| TokenIf
 	| TokenElse
 	| TokenReturn
+	| TokenExtern
 	| TokenInt Int
 	| TokenString String
 	| TokenVarname String
@@ -32,6 +33,8 @@ data Token
 	| TokenGt
 	| TokenLe
 	| TokenGe
+	| TokenAnd
+	| TokenOr
 	deriving Show
 
 lexer :: String -> [Token]
@@ -60,10 +63,15 @@ lexer ('<':cs) = TokenLt : lexer cs
 lexer ('>':cs) = TokenGt : lexer cs
 lexer (',':cs) = TokenC : lexer cs
 lexer (';':cs) = TokenSC : lexer cs
+lexer ('&':'&':cs) = TokenAnd : lexer cs
+lexer ('|':'|':cs) = TokenOr : lexer cs
 lexer ('|':cs) = TokenPipe : lexer cs
 lexer ('"':cs) = lexString "" cs
 
 lexString s ('"':cs) = TokenString s : lexer cs
+lexString s ('\\':'n':cs) = lexString (s ++ "\n") cs
+lexString s ('\\':'t':cs) = lexString (s ++ "\t") cs
+lexString s ('\\':'\\':cs) = lexString (s ++ "\\") cs
 lexString s (c:cs) = lexString (s ++ [c]) cs
 lexString s [] = error ("Unclosed string: " ++ s)
 
@@ -78,4 +86,5 @@ lexVar cs =
 		("if",rest)     -> TokenIf : lexer rest
 		("else",rest)   -> TokenElse : lexer rest
 		("return",rest) -> TokenReturn : lexer rest
+		("extern",rest) -> TokenExtern : lexer rest
 		(var,rest)      -> TokenVarname var : lexer rest
