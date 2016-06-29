@@ -38,7 +38,7 @@ dt2pdt (Typename "Void" []) = pVoid
 dt2pdt (Typename name dts) = PInterface name (map dt2pdt dts)
 
 ctype :: PDatatype -> String -> String
-ctype (PInterface "List" [a]) n = ctype a ('*':n)
+ctype (PInterface "List" [a]) n = "struct List1" ++ pdt2str a ++ " " ++ n
 ctype (PInterface "Func" (r:ps)) n = ctype r ("(*" ++ n ++ ")(" ++ cparams ps ++ ")")
 ctype (PInterface "Int" []) n = "int " ++ n
 ctype (PInterface "Bool" []) n = "int " ++ n
@@ -59,27 +59,41 @@ pdt2str (PInterface a as) = a ++ show (length as) ++ concatMap pdt2str as
 -- Validaattori käyttää nykyisen muuttujaympäristön määrittelemiseen Map-oliota
 -- Mahdolliset virheet kirjoitetaan String-Writeriin
 
-type Generator = WriterT [String] (WriterT [String] (Writer [String]))
+type Generator = WriterT [String] (WriterT [String] (WriterT [String] (Writer [String])))
 type Compiler a = StateT Scope Generator a
 
 data Scope = Scope {
-    functionName :: String,
-    variables :: Map.Map String PDatatype,
-    expectedReturnType :: PDatatype,
+    varscope :: VarScope,
     extends :: Map.Map String [PDatatype],
     typeMethods :: Map.Map String [Function],
-    counter :: Int
+    counter :: Int,
+    definedStructs :: [String]
+}
+
+data VarScope = VarScope {
+    functionName :: String,
+    variables :: Map.Map String PDatatype,
+    expectedReturnType :: PDatatype
 }
 
 putVar :: String -> PDatatype -> Compiler ()
 putVar name dtype = do scope <- get
-                       let m = variables scope
+                       let vscope = varscope scope
+                           m = variables vscope
                            m' = Map.insert name dtype m
-                       put scope { variables = m' }
+                       put scope { varscope = vscope { variables = m' } }
+
+saveScope :: Compiler VarScope
+saveScope = do scope <- get
+               return $ varscope scope
+
+restoreScope :: VarScope -> Compiler ()
+restoreScope vscope = do scope <- get
+                         put scope { varscope = vscope }
 
 getVar :: String -> Compiler (Maybe PDatatype)
 getVar name = do scope <- get
-                 return $ Map.lookup name $ variables scope
+                 return $ Map.lookup name $ variables $ varscope scope
 
 getVarOrError :: String -> Compiler PDatatype
 getVarOrError name = do t <- getVar name
@@ -90,11 +104,11 @@ getVarOrError name = do t <- getVar name
 
 getExpectedReturnType :: Compiler PDatatype
 getExpectedReturnType = do scope <- get
-                           return $ expectedReturnType scope
+                           return $ expectedReturnType $ varscope scope
 
 getCurrentFunctionName :: Compiler String
 getCurrentFunctionName = do scope <- get
-                            return $ functionName scope
+                            return $ functionName $ varscope scope
 
 getModelMethods :: PDatatype -> Compiler [Function]
 getModelMethods (PInterface a _)
@@ -144,46 +158,57 @@ tmpVar = do id <- nextNum
 
 -- Koodingeneroiminen
 
-generateFunction :: PDatatype -> String -> [(String, PDatatype)] -> Generator ()
+generateFunction :: PDatatype -> String -> [(String, PDatatype)] -> Compiler ()
 generateFunction rtype name params
     = do let paramS = joinColon $ map (\(n,t) -> ctype t n) params
              name' = name ++ "(" ++ paramS ++ ")"
-         tell [ctype rtype name', "{\n"]
+         lift $ tell [ctype rtype name', "{\n"]
 
 joinColon :: [String] -> String
 joinColon [] = ""
 joinColon [p] = p
 joinColon (p:ps) = p ++ (',':joinColon ps)
 
-generateIf :: String -> Generator()
+generateIf :: String -> Compiler ()
 generateIf cond
-    = tell ["if(", cond, "){\n"]
+    = lift $ tell ["if(", cond, "){\n"]
 
-generateWhile :: String -> Generator()
+generateWhile :: String -> Compiler ()
 generateWhile cond
-    = tell ["while(", cond, "){\n"]
+    = lift $ tell ["while(", cond, "){\n"]
 
-generateElse :: Generator()
+generateElse :: Compiler  ()
 generateElse
-    = tell ["}else{\n"]
+    = lift $ tell ["}else{\n"]
 
-generateEnd :: Generator()
+generateEnd :: Compiler ()
 generateEnd
-    = tell ["}\n"]
+    = lift $ tell ["}\n"]
 
-generateCreate :: PDatatype -> String -> String -> Generator()
+generateCreate :: PDatatype -> String -> String -> Compiler ()
 generateCreate dt var value
-    = tell [ctype dt var,"=",value,";\n"]
+    = do lift $ tell [ctype dt var,"=",value,";\n"]
+         case dt of
+            PInterface "List" [a]
+                -> do
+                    let n = "List1" ++ pdt2str a
+                    scope <- get
+                    unless (n `elem` definedStructs scope) (do
+                        put scope { definedStructs = n : definedStructs scope }
+                        lift $ generateSuperHeaderCode
+                            ("struct "++n++"{int len;" ++ ctype a "*arr" ++ ";};\n")
+                     )
+            _   -> return ()
 
-generateAssign :: String -> String -> Generator()
+generateAssign :: String -> String -> Compiler ()
 generateAssign var value
     = tell [var,"=",value,";\n"]
 
-generateReturn :: String -> Generator()
+generateReturn :: String -> Compiler ()
 generateReturn value
     = tell ["return ", value, ";\n"]
 
-generateCode :: String -> Generator()
+generateCode :: String -> Generator ()
 generateCode code
     = tell [code]
 
@@ -207,11 +232,15 @@ generateHeaderCode :: String -> Generator ()
 generateHeaderCode code
     = lift $ tell [code]
 
+generateSuperHeaderCode :: String -> Generator ()
+generateSuperHeaderCode code
+    = lift . lift $ tell [code]
+
 -- Apufunktioita tyyppien tarkistamiseen ja virheisiin
 
 tellError :: String -> Compiler ()
 tellError msg = do fname <- getCurrentFunctionName
-                   lift . lift . lift $ tell ["Error in " ++ fname ++ ": " ++ msg]
+                   lift . lift . lift . lift $ tell ["Error in " ++ fname ++ ": " ++ msg]
 
 typemismatch :: PDatatype -> PDatatype -> Compiler ()
 typemismatch right wrong
@@ -224,14 +253,29 @@ checktype :: String -> String -> PDatatype -> PDatatype -> Compiler ()
 checktype v f right cand
     = do es <- getExtends cand
          if right `elem` es
-            then do lift $ generateCreate right v ("alloc(sizeof(struct "++pdt2str right++"))")
+            then do generateCreate right v ("alloc(sizeof(struct "++pdt2str right++"))")
                     ms <- getModelMethods right
                     forM_ ms (\m ->
-                        lift $ generateAssign (v++"->"++name m) (pdt2str cand++'_':name m)
+                        generateAssign (v++"->"++name m) (pdt2str cand++'_':name m)
                      )
-                    lift $ generateAssign (v++"->_obj") ("&"++f)
-            else do unless (cand == right) (typemismatch right cand)
-                    lift $ generateCreate right v f
+                    generateAssign (v++"->_obj") ("alloc(sizeof("++ctype cand ""++"))")
+                    generateAssign ("*("++ctype cand "*"++")"++v++"->_obj") f
+            else case (right, cand) of
+                (PInterface "List" [t], PInterface "List" [u])
+                    -> do generateCreate right v
+                            ('{': f ++ ".len, alloc(" ++ f ++ ".len*sizeof(" ++ ctype right "" ++ "))}")
+                          generateAssign (v++".len") (f++".len")
+                          ctr <- tmpVar
+                          generateCreate pInteger ctr "0"
+                          generateWhile (ctr++"<"++f++".len")
+                          var <- tmpVar
+                          checktype var (f++".arr["++ctr++"]") t u
+                          generateAssign (v++".arr["++ctr++"]") var
+                          generateAssign ctr (ctr ++ "+1")
+                          generateEnd
+                _
+                    -> do unless (cand == right) (typemismatch right cand)
+                          generateCreate right v f
 
 checkargs :: [PDatatype] -> [Expression] -> Compiler [String]
 checkargs paramTs args = if length paramTs /= length args
@@ -260,7 +304,18 @@ compile decls = do let pvars = map decl2pvar
                    let supers = collapse extends
                    generateHeaderCode "#include <stdlib.h>\n"
                    generateHeaderCode "void * alloc(size_t x) { return malloc(x); }\n"
-                   rec (mapM (compileDecl supers models pvars)) decls
+                   let scope = Scope {
+                      varscope = VarScope {
+                        functionName = "",
+                        variables = Map.empty,
+                        expectedReturnType = PNothing
+                      },
+                      counter = 0,
+                      extends = supers,
+                      typeMethods = models,
+                      definedStructs = []
+                   }
+                   runStateT (rec (mapM (compileDecl pvars)) decls) scope
                    return ()
 
 collapse :: (Ord k) => [(k, a)] -> Map.Map k [a]
@@ -273,47 +328,46 @@ rec f a  = do v <- f a
 
 -- Kääntää yksittäisen funktion
 
-compileDecl :: Map.Map String [PDatatype] -> Map.Map String [Function]
-               -> [PVariable] -> Declaration -> Generator [Declaration]
-compileDecl _ _ pvars (Func decl@Function { name = fname, parameters = params,
-                                            returnType=rtype, body = Extern })
-    = do generateExternFunctionHeader (dt2pdt rtype) [] fname
+compileDecl :: [PVariable] -> Declaration
+               -> Compiler [Declaration]
+compileDecl pvars (Func decl@Function { name = fname, parameters = params,
+                                        returnType=rtype, body = Extern })
+    = do lift $ generateExternFunctionHeader (dt2pdt rtype) [] fname
          return []
-compileDecl ms fs pvars (Func func) =
+compileDecl pvars (Func func) =
     let fname = name func
         params = map (\(n,d) -> (n,dt2pdt d)) (parameters func)
         rtype = dt2pdt $ returnType func
-        scope = Scope {
-            functionName = fname,
-            variables = Map.fromList $ pvars ++ params,
-            expectedReturnType = rtype,
-            counter = 0,
-            extends = ms,
-            typeMethods = fs
-        }
-    in do generateFunctionHeader rtype (map snd params) fname
+    in do scope <- get
+          let vscope = varscope scope
+          put scope { varscope = vscope {
+              functionName = fname,
+              variables = Map.fromList $ pvars ++ params,
+              expectedReturnType = rtype
+           }}
+          lift $ generateFunctionHeader rtype (map snd params) fname
           generateFunction rtype fname params
-          runStateT (compileStatement $ body func) scope
+          compileStatement $ body func
           generateEnd
           return []
-compileDecl _ _ _ (Mdl m) =
-    do generateHeaderCode ("struct " ++ modelName m ++ "{\n")
-       forM_ (methods m) (\m ->
-            let r = dt2pdt $ returnType m
-                ps = map (dt2pdt.snd) $ parameters m
-            in generateHeaderCode("    " ++
-                                  ctype r ('(':'*':name m ++ ")(" ++ cparams ps ++ ")") ++ ";\n"))
-       generateHeaderCode "    void *_obj;\n};\n"
+compileDecl _ (Mdl m) =
+    do lift $ generateHeaderCode ("struct " ++ modelName m ++ "{\n")
+       forM_ (methods m) (\f ->
+            let r = dt2pdt $ returnType f
+                ps = PInterface (modelName m) [] : map (dt2pdt.snd) (parameters f)
+            in lift $ generateHeaderCode("    " ++
+                ctype r ('(':'*':name f ++ ")(" ++ cparams ps ++ ")") ++ ";\n"))
+       lift $ generateHeaderCode "    void *_obj;\n};\n"
        return []
-compileDecl _ _ _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
+compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
     forM fs (\f -> do
         let r = dt2pdt $ returnType f
             ps = ctype (dt2pdt m) "this" : map (\(n,d) -> ctype (dt2pdt d) n) (parameters f)
             ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)") : map fst (parameters f)
             signature = ctype r (n ++ "_" ++ name f ++ "(" ++ joinColon ps ++ ")")
-        generateHeaderCode (signature ++ ";\n")
-        generateCode (signature ++ " {\n")
-        generateCode ("    _" ++ n ++ "_" ++ name f ++ "(" ++ joinColon ps' ++ ");\n}\n")
+        lift $ generateHeaderCode (signature ++ ";\n")
+        lift $ generateCode (signature ++ " {\n")
+        lift $ generateCode ("    _" ++ n ++ "_" ++ name f ++ "(" ++ joinColon ps' ++ ");\n}\n")
         return (Func f {
             name = '_' : n ++ "_" ++ name f,
             parameters = ("this", Typename n []) : parameters f
@@ -324,9 +378,9 @@ compileDecl _ _ _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
 
 compileStatement :: Statement -> Compiler ()
 compileStatement (Block stmts)
-    = do scope <- get
+    = do scope <- saveScope
          mapM_ compileStatement stmts
-         put scope
+         restoreScope scope
 compileStatement (Create name expr)
     = do dt <- compileExpression name expr
          putVar name dt
@@ -336,34 +390,34 @@ compileStatement (Assign name expr)
          dt <- getVarOrError name
          var' <- tmpVar
          checktype var' var dt vt
-         lift $ generateAssign name var'
+         generateAssign name var'
 compileStatement (If expr thenBody elseBody)
     = do var <- tmpVar
          dt <- compileExpression var expr
          unless (dt == pBool) (typemismatch pBool dt)
-         lift $ generateIf var
+         generateIf var
          compileStatement thenBody
          case elseBody of
-            Just stmt -> do lift generateElse
+            Just stmt -> do generateElse
                             compileStatement stmt
             Nothing -> return ()
-         lift generateEnd
+         generateEnd
 compileStatement (For name expr body)
     = do var <- tmpVar
          dt <- compileExpression var expr
          ctr <- tmpVar
-         lift $ generateCreate pInteger ctr "0"
-         lift $ generateWhile (ctr++"< *"++var)
+         generateCreate pInteger ctr "0"
+         generateWhile (ctr++"<"++var++".len")
          case dt of
             PInterface "List" [dt']
-                -> do scope <- get
+                -> do scope <- saveScope
                       putVar name dt'
-                      lift $ generateCreate dt' name (var++"["++ctr++"+1]")
+                      generateCreate dt' name (var++".arr["++ctr++"]")
                       compileStatement body
-                      lift $ generateAssign ctr (ctr ++ "+1")
-                      put scope
+                      generateAssign ctr (ctr ++ "+1")
+                      restoreScope scope
             _   -> typemismatch (pList PNothing) dt
-         lift generateEnd
+         generateEnd
 compileStatement (Expr (Call expr args))
     = do var <- tmpVar
          dt <- compileExpression var expr
@@ -384,18 +438,18 @@ compileStatement (Return expr)
          rt <- getExpectedReturnType
          var' <- tmpVar
          checktype var' var rt dt
-         lift $ generateReturn var'
+         generateReturn var'
 
 -- Lausekkeiden validaattorit
 
 compileExpression :: String -> Expression -> Compiler PDatatype
-compileExpression v (Int i) = do lift $ generateCreate pInteger v (show i)
+compileExpression v (Int i) = do generateCreate pInteger v (show i)
                                  return pInteger
-compileExpression v (Str s) = do lift $ generateCreate pString v (show s)
+compileExpression v (Str s) = do generateCreate pString v (show s)
                                  return pString
 compileExpression v (Var name)
     = do dt <- getVarOrError name
-         lift $ generateCreate dt v name
+         generateCreate dt v name
          return dt
 compileExpression v (Call expr args)
     = do var <- tmpVar
@@ -403,7 +457,7 @@ compileExpression v (Call expr args)
          case dt of
             PInterface "Func" (retType:paramTypes)
                 -> do argcodes <- checkargs paramTypes args
-                      lift $ generateCreate retType v (var++"("++joinColon argcodes++")")
+                      generateCreate retType v (var++"("++joinColon argcodes++")")
                       return retType
             _ -> do typemismatch (pFunction PNothing []) dt
                     return PNothing
@@ -411,15 +465,16 @@ compileExpression v (List (expr:exprs))
     = do var <- tmpVar
          dt <- compileExpression var expr -- Käännetään ensimmäisen alkion koodi
                                           -- tyypin selvittämiseksi
-         lift $ generateCreate (pList dt) v ("malloc("++show (length exprs + 1)
-                                             ++ "*sizeof(" ++ ctype dt ""++ "))")
-         lift $ generateAssign (v++"[0]") (show $ length exprs + 1)
-         lift $ generateAssign (v++"[1]") var
+         generateCreate (pList dt) v ('{': show (length exprs) ++ ", alloc("
+                                      ++ show (length exprs)
+                                      ++ "*sizeof(" ++ ctype dt "" ++ "))}")
+         generateAssign (v++".len") (show $ length exprs + 1)
+         generateAssign (v++".arr[0]") var
          mapM_ (\(i,val) -> do var' <- tmpVar
                                vt <- compileExpression var' val
                                var'' <- tmpVar
                                checktype var'' var' dt vt
-                               lift $ generateAssign (v++"["++show (i+1)++"]") var''
+                               generateAssign (v ++ ".arr["++show i++"]") var''
                ) (zip [1..length exprs] exprs)
          return (pList dt)
 compileExpression v (MethodCall obj method args)
@@ -444,24 +499,24 @@ compileMethodCall v obj (PInterface "Str" []) "+" args
 compileMethodCall v obj (PInterface "Int" []) method args
     | method == "+" || method == "-" || method == "*" || method == "/"
         = do (var:vars) <- checkargs [pInteger] args
-             lift $ generateCreate pInteger v (obj++method++var)
+             generateCreate pInteger v (obj++method++var)
              return pInteger
     | method == "==" || method == "!=" || method == "<" || method == ">"
         || method == "<=" || method == ">="
         = do (var:vars) <- checkargs [pInteger] args
-             lift $ generateCreate pInteger v (obj++method++var)
+             generateCreate pInteger v (obj++method++var)
              return pBool
 
 -- PList
 compileMethodCall v obj (PInterface "List" [dt]) method args
     | method == "[]"
         = do (index:vars) <- checkargs [pInteger] args
-             lift $ generateCreate dt v (obj++"["++index++"+1]")
+             generateCreate dt v (obj ++ ".arr["++index++"]")
              return dt
     | method == "[]="
         = do (index:value:vars) <- checkargs [pInteger, dt] args
-             lift $ generateAssign (obj++"["++index++"+1]") value
-             lift $ generateCreate dt v value
+             generateAssign (obj ++ ".arr["++index++"]") value
+             generateCreate dt v value
              return dt
 -- Määrittelemättömät metodit
 compileMethodCall v obj dt method args
@@ -478,7 +533,7 @@ compileMethodCall v obj dt method args
 
 compileMethodCall' v f n obj args = do
     argcodes <- checkargs (map (\(n,d) -> dt2pdt d) (parameters f)) args
-    lift $ generateCreate (dt2pdt $ returnType f) v
+    generateCreate (dt2pdt $ returnType f) v
         (n++"("++joinColon (obj:argcodes)++")")
     return (dt2pdt $ returnType f)
 
@@ -487,8 +542,9 @@ compileMethodCall' v f n obj args = do
 main = do c <- getContents
           let lexemes = lexer c
           let tree = parsePScript lexemes
-          let (((_, code), header), errors) =
-                runWriter $ runWriterT $ runWriterT $ compile tree
+          let ((((_, code), header), sheader), errors) =
+                runWriter $ runWriterT $ runWriterT $ runWriterT $ compile tree
+          forM_ sheader putStr
           forM_ header putStr
           forM_ code putStr
           forM_ errors (hPutStrLn stderr)
