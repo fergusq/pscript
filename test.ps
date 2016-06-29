@@ -1,20 +1,24 @@
-extern Int[] malloc(Int i);
 extern Void printf(Str s, Int i);
 
-Void print(Int i) { printf("%d\n", i); }
+Void printInt(Int i) { printf("%d\n", i); }
 
-Int[] fromTo(Int from, Int to) {
-	var arr = malloc(to-from+1);
-	arr[0-1] = to-from+1;
-	var i = 0;
-	for (a in arr) {
-		arr[i] = from+i;
-		i = i + 1;
+model Printable {
+	Void print();
+}
+
+extend Int with Printable {
+	Void print() {
+		printInt(this);
 	}
-	return arr;
+}
+
+Void shout(Printable p) {
+	p.print();
+	p.print();
+	p.print();
 }
 
 Void main() {
-	var arr = fromTo(1, 10);
-	for (i in arr) print(i*2);
+	var arr = [1, 2, 3, 4];
+	for (i in arr) shout(i*2);
 }

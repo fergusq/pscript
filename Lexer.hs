@@ -9,6 +9,9 @@ data Token
 	| TokenElse
 	| TokenReturn
 	| TokenExtern
+	| TokenModel
+	| TokenExtend
+	| TokenWith
 	| TokenInt Int
 	| TokenString String
 	| TokenVarname String
@@ -35,14 +38,11 @@ data Token
 	| TokenGe
 	| TokenAnd
 	| TokenOr
+	| TokenDot
 	deriving Show
 
 lexer :: String -> [Token]
 lexer [] = []
-lexer (c:cs)
-	| isSpace c = lexer cs
-	| isAlpha c = lexVar (c:cs)
-	| isDigit c = lexNum (c:cs)
 lexer ('=':'=':cs) = TokenEqEq : lexer cs
 lexer ('!':'=':cs) = TokenNeq : lexer cs
 lexer ('=':cs) = TokenEq : lexer cs
@@ -66,7 +66,13 @@ lexer (';':cs) = TokenSC : lexer cs
 lexer ('&':'&':cs) = TokenAnd : lexer cs
 lexer ('|':'|':cs) = TokenOr : lexer cs
 lexer ('|':cs) = TokenPipe : lexer cs
+lexer ('.':cs) = TokenDot : lexer cs
 lexer ('"':cs) = lexString "" cs
+lexer (c:cs)
+	| isSpace c = lexer cs
+	| isAlpha c = lexVar (c:cs)
+	| isDigit c = lexNum (c:cs)
+	| otherwise = error ("Illegal character: " ++ [c])
 
 lexString s ('"':cs) = TokenString s : lexer cs
 lexString s ('\\':'n':cs) = lexString (s ++ "\n") cs
@@ -87,4 +93,7 @@ lexVar cs =
 		("else",rest)   -> TokenElse : lexer rest
 		("return",rest) -> TokenReturn : lexer rest
 		("extern",rest) -> TokenExtern : lexer rest
+		("model",rest) -> TokenModel : lexer rest
+		("extend",rest) -> TokenExtend : lexer rest
+		("with",rest) -> TokenWith : lexer rest
 		(var,rest)      -> TokenVarname var : lexer rest

@@ -15,6 +15,9 @@ import Lexer
 	else		{ TokenElse }
 	return		{ TokenReturn }
 	extern		{ TokenExtern }
+	model		{ TokenModel }
+	extend		{ TokenExtend }
+	with		{ TokenWith }
 	int		{ TokenInt $$ }
 	str		{ TokenString $$ }
 	var		{ TokenVarname $$ }
@@ -33,6 +36,7 @@ import Lexer
 	'>'		{ TokenGt }
 	','		{ TokenC }
 	';'		{ TokenSC }
+	'.'		{ TokenDot }
 	arrow		{ TokenArrow }
 	eq		{ TokenEqEq }
 	neq		{ TokenNeq }
@@ -46,15 +50,26 @@ import Lexer
 Prog	: Decl Prog			{ ($1 : $2) }
 	| Decl				{ [$1] }
 
-Decl	: Func				{ $1 }
-	| ExternFunc			{ $1 }
+Decl	: Func				{ Func $1 }
+	| extern ExternFunc		{ Func $2 }
+	| Model				{ Mdl $1 }
+	| Extend			{ Ext $1 }
 
-Func	: Datatype var '(' Params ')' Stmt		{ Function { name = $2, parameters = $4, returnType = $1, body = $6 } }
-	| Datatype var '(' ')' Stmt			{ Function { name = $2, parameters = [], returnType = $1, body = $5 } }
+Model	: model var '{' EFuncs '}'	{ Model { modelName = $2, methods = $4 } }
+Extend	: extend var with Datatype '{' Funcs '}' { Extend { dtName = $2, model = $4, eMethods = $6 } }
+
+Funcs	: Func Funcs			{ ($1 : $2) }
+	| Func				{ [$1] }
+
+EFuncs	: ExternFunc Funcs		{ ($1 : $2) }
+	| ExternFunc			{ [$1] }
+
+Func	: Datatype var '(' Params ')' Stmt	{ Function { name = $2, parameters = $4, returnType = $1, body = $6 } }
+	| Datatype var '(' ')' Stmt		{ Function { name = $2, parameters = [], returnType = $1, body = $5 } }
 
 ExternFunc
-	: extern Datatype var '(' Params ')' ';'	{ Function { name = $3, parameters = $5, returnType = $2, body = Extern } }
-	| extern Datatype var '(' ')' ';'		{ Function { name = $3, parameters = [], returnType = $2, body = Extern } }
+	: Datatype var '(' Params ')' ';'	{ Function { name = $2, parameters = $4, returnType = $1, body = Extern } }
+	| Datatype var '(' ')' ';'		{ Function { name = $2, parameters = [], returnType = $1, body = Extern } }
 
 Params	: Parameter ',' Params		{ ($1 : $3) }
 	| Parameter			{ [$1] }
@@ -86,6 +101,8 @@ Call	: Preprim '(' Args ')'		{ Call $1 $3 }
 	| Preprim '(' ')'		{ Call $1 [] }
 	| Preprim '[' Exp ']'		{ MethodCall $1 "[]" [$3] }
 	| Preprim '[' Exp ']' '=' Exp	{ MethodCall $1 "[]=" [$3, $6] }
+	| Preprim '.' var '(' Args ')'	{ MethodCall $1 $3 $5 }
+	| Preprim '.' var '(' ')'	{ MethodCall $1 $3 [] }
 	
 
 Args	: Exp ',' Args			{ ($1 : $3) }
@@ -130,12 +147,26 @@ Prim	: int				{ Int $1 }
 parseError :: [Token] -> a
 parseError t = error ("Parse error on " ++ case t of (t:ts) -> show t
                                                      _      -> "EOF") 
-data Declaration = Function {
-		name :: String,
-		parameters :: [(String,Datatype)],
-		returnType :: Datatype,
-		body :: Statement
-	} deriving Show
+data Declaration =
+	Func Function | Mdl Model | Ext Extend deriving Show
+
+data Model = Model {
+	modelName :: String,
+	methods :: [Function]
+} deriving Show
+
+data Extend = Extend {
+	dtName :: String,
+	model :: Datatype,
+	eMethods :: [Function]
+}  deriving Show
+
+data Function = Function {
+	name :: String,
+	parameters :: [(String,Datatype)],
+	returnType :: Datatype,
+	body :: Statement
+} deriving Show
 
 data Datatype = Typename String [Datatype] deriving Show
 
