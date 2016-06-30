@@ -477,6 +477,16 @@ compileExpression v (List (expr:exprs))
                                generateAssign (v ++ ".arr["++show i++"]") var''
                ) (zip [1..length exprs] exprs)
          return (pList dt)
+compileExpression v (NewList dt size)
+    = do let pdt = dt2pdt dt
+         var <- tmpVar
+         vt <- compileExpression var size
+         var' <- tmpVar
+         checktype var' var pInteger vt
+         generateCreate (pList pdt) v ('{': var' ++ ", alloc("
+                                      ++ var'
+                                      ++ "*sizeof(" ++ ctype pdt "" ++ "))}")
+         return (pList pdt)
 compileExpression v (MethodCall obj method args)
     = do var <- tmpVar
          dt <- compileExpression var obj

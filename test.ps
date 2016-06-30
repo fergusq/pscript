@@ -12,6 +12,16 @@ extend Int with Printable {
 	}
 }
 
+Int[] fromTo(Int from, Int to) {
+	var list = new Int[to-from+1];
+	var i = 0;
+	for (value in list) {
+		list[i] = from+i;
+		i = i + 1;
+	}
+	return list;
+}
+
 Void shout(Printable p) {
 	p.print();
 	p.print();
@@ -23,6 +33,6 @@ Void shoutAll(Printable[] ps) {
 }
 
 Void main() {
-	var arr = [1, 2, 3, 4];
+	var arr = fromTo(1, 4);
 	shoutAll(arr);
 }

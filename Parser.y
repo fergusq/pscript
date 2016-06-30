@@ -18,6 +18,7 @@ import Lexer
 	model		{ TokenModel }
 	extend		{ TokenExtend }
 	with		{ TokenWith }
+	new		{ TokenNew }
 	int		{ TokenInt $$ }
 	str		{ TokenString $$ }
 	var		{ TokenVarname $$ }
@@ -142,6 +143,7 @@ Prim	: int				{ Int $1 }
 	| var				{ Var $1 }
 	| '(' Exp ')'			{ $2 }
 	| '[' Args ']'			{ List $2 }
+	| new Datatype '[' Exp ']'	{ NewList $2 $4 }
 
 {
 parseError :: [Token] -> a
@@ -188,6 +190,7 @@ data Expression
 	| Var String
 	| List [Expression]
 	| Call Expression [Expression]
+	| NewList Datatype Expression
 	deriving Show
 }
 

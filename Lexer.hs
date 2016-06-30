@@ -12,6 +12,7 @@ data Token
 	| TokenModel
 	| TokenExtend
 	| TokenWith
+	| TokenNew
 	| TokenInt Int
 	| TokenString String
 	| TokenVarname String
@@ -93,7 +94,8 @@ lexVar cs =
 		("else",rest)   -> TokenElse : lexer rest
 		("return",rest) -> TokenReturn : lexer rest
 		("extern",rest) -> TokenExtern : lexer rest
-		("model",rest) -> TokenModel : lexer rest
+		("model",rest)  -> TokenModel : lexer rest
 		("extend",rest) -> TokenExtend : lexer rest
-		("with",rest) -> TokenWith : lexer rest
+		("with",rest)   -> TokenWith : lexer rest
+		("new",rest)    -> TokenNew : lexer rest
 		(var,rest)      -> TokenVarname var : lexer rest
