@@ -38,6 +38,7 @@ import Lexer
 	','		{ TokenC }
 	';'		{ TokenSC }
 	'.'		{ TokenDot }
+	'$'		{ TokenDollar }
 	arrow		{ TokenArrow }
 	eq		{ TokenEqEq }
 	neq		{ TokenNeq }
@@ -82,6 +83,7 @@ Datatype: var				{ Typename $1 [] }
 	| Datatype arrow Datatype	{ Typename "Func" [$3, $1] }
 	| '(' DtList ')' arrow Datatype	{ Typename "Func" ($5:$2) }
 	| '(' ')' arrow Datatype	{ Typename "Func" [$4] }
+	| '$'				{ DollarType }
 
 DtList	: Datatype DtList		{ ($1 : $2) }
 	| Datatype			{ [$1] }
@@ -170,7 +172,7 @@ data Function = Function {
 	body :: Statement
 } deriving Show
 
-data Datatype = Typename String [Datatype] deriving Show
+data Datatype = Typename String [Datatype] | DollarType deriving Show
 
 data Statement
 	= Create String Expression

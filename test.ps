@@ -12,6 +12,26 @@ extend Int with Printable {
 	}
 }
 
+model Squarable {
+	$ square();
+}
+
+extend Int with Squarable {
+	Int square() {
+		return this*this;
+	}
+}
+
+model Duplicable {
+	$[] duplicate();
+}
+
+extend Int with Duplicable {
+	Int[] duplicate() {
+		return [this, this];
+	}
+}
+
 Int[] fromTo(Int from, Int to) {
 	var list = new Int[to-from+1];
 	var i = 0;
@@ -34,5 +54,7 @@ Void shoutAll(Printable[] ps) {
 
 Void main() {
 	var arr = fromTo(1, 4);
+	for (i in arr) i.square().print();
 	shoutAll(arr);
+	shoutAll(10.duplicate());
 }

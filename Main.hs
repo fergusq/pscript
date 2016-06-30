@@ -10,6 +10,7 @@ import Lexer
 type PVariable = (String, PDatatype)
 
 data PDatatype = PInterface String [PDatatype]
+               | PDollar
                | PNothing deriving (Eq, Show)
 
 -- PNothing on pseudotyyppi, jonka kääntäjä antaa virheellisille lausekkeille
@@ -20,6 +21,11 @@ pInteger = PInterface "Int" []
 pBool = PInterface "Bool" []
 pString = PInterface "Str" []
 pVoid = PInterface "Void" []
+
+ifDollar :: PDatatype -> PDatatype -> PDatatype
+ifDollar PDollar t           = t
+ifDollar (PInterface n ts) t = PInterface n (map (`ifDollar` t) ts)
+ifDollar PNothing _          = PNothing
 
 -- Tekee jokaisesta deklaraatiosta PVariable-olion
 
@@ -36,6 +42,7 @@ dt2pdt (Typename "Str" []) = pString
 dt2pdt (Typename "Bool" []) = pBool
 dt2pdt (Typename "Void" []) = pVoid
 dt2pdt (Typename name dts) = PInterface name (map dt2pdt dts)
+dt2pdt DollarType = PDollar
 
 ctype :: PDatatype -> String -> String
 ctype (PInterface "List" [a]) n = "struct List1" ++ pdt2str a ++ " " ++ n
@@ -171,23 +178,23 @@ joinColon (p:ps) = p ++ (',':joinColon ps)
 
 generateIf :: String -> Compiler ()
 generateIf cond
-    = lift $ tell ["if(", cond, "){\n"]
+    = lift $ tell ["    if(", cond, "){\n"]
 
 generateWhile :: String -> Compiler ()
 generateWhile cond
-    = lift $ tell ["while(", cond, "){\n"]
+    = lift $ tell ["    while(", cond, "){\n"]
 
 generateElse :: Compiler  ()
 generateElse
-    = lift $ tell ["}else{\n"]
+    = lift $ tell ["    }else{\n"]
 
 generateEnd :: Compiler ()
 generateEnd
-    = lift $ tell ["}\n"]
+    = lift $ tell ["    }\n"]
 
 generateCreate :: PDatatype -> String -> String -> Compiler ()
 generateCreate dt var value
-    = do lift $ tell [ctype dt var,"=",value,";\n"]
+    = do lift $ tell ["    ", ctype dt var,"=",value,";\n"]
          case dt of
             PInterface "List" [a]
                 -> do
@@ -202,11 +209,11 @@ generateCreate dt var value
 
 generateAssign :: String -> String -> Compiler ()
 generateAssign var value
-    = tell [var,"=",value,";\n"]
+    = tell ["    ",var,"=",value,";\n"]
 
 generateReturn :: String -> Compiler ()
 generateReturn value
-    = tell ["return ", value, ";\n"]
+    = tell ["    return ", value, ";\n"]
 
 generateCode :: String -> Generator ()
 generateCode code
@@ -353,7 +360,7 @@ compileDecl pvars (Func func) =
 compileDecl _ (Mdl m) =
     do lift $ generateHeaderCode ("struct " ++ modelName m ++ "{\n")
        forM_ (methods m) (\f ->
-            let r = dt2pdt $ returnType f
+            let r = dt2pdt (returnType f) `ifDollar` PInterface (modelName m) []
                 ps = PInterface (modelName m) [] : map (dt2pdt.snd) (parameters f)
             in lift $ generateHeaderCode("    " ++
                 ctype r ('(':'*':name f ++ ")(" ++ cparams ps ++ ")") ++ ";\n"))
@@ -361,17 +368,32 @@ compileDecl _ (Mdl m) =
        return []
 compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
     forM fs (\f -> do
-        let r = dt2pdt $ returnType f
-            ps = ctype (dt2pdt m) "this" : map (\(n,d) -> ctype (dt2pdt d) n) (parameters f)
-            ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)") : map fst (parameters f)
-            signature = ctype r (n ++ "_" ++ name f ++ "(" ++ joinColon ps ++ ")")
-        lift $ generateHeaderCode (signature ++ ";\n")
-        lift $ generateCode (signature ++ " {\n")
-        lift $ generateCode ("    _" ++ n ++ "_" ++ name f ++ "(" ++ joinColon ps' ++ ");\n}\n")
-        return (Func f {
-            name = '_' : n ++ "_" ++ name f,
-            parameters = ("this", Typename n []) : parameters f
-        })
+        mf' <- getModelMethod (dt2pdt m) (name f)
+        if isNothing mf'
+            then do tellError ("Invalid extension of " ++ n ++ " with "
+                            ++ name f ++ "(): no such method")
+                    return $ Func f -- palautetaan jotain tyhmää, virheen vuoksi mitään
+                                    -- järkevää ei voi palauttaa
+            else do
+                let (Just mf) = mf'
+                    mr = dt2pdt $ returnType mf
+                    r = dt2pdt $ returnType f
+                    ps = ctype (dt2pdt m) "this"
+                        : map (\(n,d) -> ctype (dt2pdt d) n) (parameters f)
+                    ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)")
+                        : map fst (parameters f)
+                    signature = ctype (mr `ifDollar` dt2pdt m)
+                        (n ++ "_" ++ name f ++ "(" ++ joinColon ps ++ ")")
+                lift $ generateHeaderCode (signature ++ ";\n")
+                lift $ generateCode (signature ++ " {\n")
+                generateCreate r "_ret" ("_" ++ n ++ "_" ++ name f ++ "(" ++ joinColon ps' ++ ")")
+                checktype "_ret2" "_ret" (mr `ifDollar` dt2pdt m) r
+                generateReturn "_ret2"
+                lift $ generateCode "\n}\n"
+                return (Func f {
+                    name = '_' : n ++ "_" ++ name f,
+                    parameters = ("this", Typename n []) : parameters f
+                })
     )
 
 -- Lauseiden kääntäjät
@@ -538,14 +560,15 @@ compileMethodCall v obj dt method args
                                 tellError ("type " ++ show dt ++ " does not have method `" ++ method ++ "'")
                                 return PNothing
                             Just p' ->
-                                compileMethodCall' v p' (obj++"->"++method) obj args
-            Just m' -> compileMethodCall' v m' (pdt2str dt++'_':method) obj args
+                                compileMethodCall' v p' (obj++"->"++method) obj dt args
+            Just m' -> compileMethodCall' v m' ('_':pdt2str dt++'_':method) obj dt args
 
-compileMethodCall' v f n obj args = do
+compileMethodCall' v f n obj dt args = do
+    let r = dt2pdt (returnType f) `ifDollar` dt
     argcodes <- checkargs (map (\(n,d) -> dt2pdt d) (parameters f)) args
-    generateCreate (dt2pdt $ returnType f) v
+    generateCreate r v
         (n++"("++joinColon (obj:argcodes)++")")
-    return (dt2pdt $ returnType f)
+    return r
 
 -- Ajaa kääntäjän ja tulostaa virheet
 
