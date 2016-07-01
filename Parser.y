@@ -39,6 +39,7 @@ import Lexer
 	';'		{ TokenSC }
 	'.'		{ TokenDot }
 	'$'		{ TokenDollar }
+	'&'		{ TokenAmp }
 	arrow		{ TokenArrow }
 	eq		{ TokenEqEq }
 	neq		{ TokenNeq }
@@ -78,12 +79,18 @@ Params	: Parameter ',' Params		{ ($1 : $3) }
 
 Parameter : Datatype var		{ ($2, $1) }
 
-Datatype: var				{ Typename $1 [] }
+Datatype: PrimDT			{ $1 }
+	| '$'				{ DollarType }
+	| PrimDT '&' SumDT		{ SumType ($1:$3) }
 	| Datatype '[' ']'		{ Typename "List" [$1] }
 	| Datatype arrow Datatype	{ Typename "Func" [$3, $1] }
 	| '(' DtList ')' arrow Datatype	{ Typename "Func" ($5:$2) }
 	| '(' ')' arrow Datatype	{ Typename "Func" [$4] }
-	| '$'				{ DollarType }
+
+SumDT	: PrimDT '&' SumDT		{ ($1 : $3) }
+	| PrimDT			{ [$1] }
+
+PrimDT	: var				{ Typename $1 [] }
 
 DtList	: Datatype DtList		{ ($1 : $2) }
 	| Datatype			{ [$1] }
@@ -172,7 +179,10 @@ data Function = Function {
 	body :: Statement
 } deriving Show
 
-data Datatype = Typename String [Datatype] | DollarType deriving Show
+data Datatype
+	= Typename String [Datatype]
+	| SumType [Datatype]
+	| DollarType deriving Show
 
 data Statement
 	= Create String Expression

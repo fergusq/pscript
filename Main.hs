@@ -1,167 +1,14 @@
 module Main where
+import qualified Data.Map as Map
 import Control.Monad.Writer
 import Control.Monad.State
-import qualified Data.Map as Map
 import Data.Maybe
 import System.IO
 import Parser
 import Lexer
-
-type PVariable = (String, PDatatype)
-
-data PDatatype = PInterface String [PDatatype]
-               | PDollar
-               | PNothing deriving (Eq, Show)
-
--- PNothing on pseudotyyppi, jonka kääntäjä antaa virheellisille lausekkeille
-
-pList a = PInterface "List" [a]
-pFunction r ps = PInterface "Func" (r:ps)
-pInteger = PInterface "Int" []
-pBool = PInterface "Bool" []
-pString = PInterface "Str" []
-pVoid = PInterface "Void" []
-
-ifDollar :: PDatatype -> PDatatype -> PDatatype
-ifDollar PDollar t           = t
-ifDollar (PInterface n ts) t = PInterface n (map (`ifDollar` t) ts)
-ifDollar PNothing _          = PNothing
-
--- Tekee jokaisesta deklaraatiosta PVariable-olion
-
-decl2pvar :: Function -> PVariable
-decl2pvar f = (name f, pFunction (dt2pdt $ returnType f) (map (dt2pdt . snd) $ parameters f))
-
--- Muuttaa tietotyypin PDatatype-olioksi
-
-dt2pdt :: Datatype -> PDatatype
-dt2pdt (Typename "List" [dt]) = pList $ dt2pdt dt
-dt2pdt (Typename "Func" (dt:dts)) = pFunction (dt2pdt dt) (map dt2pdt dts)
-dt2pdt (Typename "Int" []) = pInteger
-dt2pdt (Typename "Str" []) = pString
-dt2pdt (Typename "Bool" []) = pBool
-dt2pdt (Typename "Void" []) = pVoid
-dt2pdt (Typename name dts) = PInterface name (map dt2pdt dts)
-dt2pdt DollarType = PDollar
-
-ctype :: PDatatype -> String -> String
-ctype (PInterface "List" [a]) n = "struct List1" ++ pdt2str a ++ " " ++ n
-ctype (PInterface "Func" (r:ps)) n = ctype r ("(*" ++ n ++ ")(" ++ cparams ps ++ ")")
-ctype (PInterface "Int" []) n = "int " ++ n
-ctype (PInterface "Bool" []) n = "int " ++ n
-ctype (PInterface "Str" []) n = "char*" ++ n
-ctype (PInterface "Void" []) n = "char " ++ n
-ctype PNothing n = "void*" ++ n
-ctype (PInterface a _) n = "struct " ++ a ++ ('*':n)
-
-cparams :: [PDatatype] -> String
-cparams [] = ""
-cparams [a] = ctype a ""
-cparams (a:as) = ctype a "" ++ ", " ++ cparams as
-
-pdt2str :: PDatatype -> String
-pdt2str (PInterface a []) = a
-pdt2str (PInterface a as) = a ++ show (length as) ++ concatMap pdt2str as
-
--- Validaattori käyttää nykyisen muuttujaympäristön määrittelemiseen Map-oliota
--- Mahdolliset virheet kirjoitetaan String-Writeriin
-
-type Generator = WriterT [String] (WriterT [String] (WriterT [String] (Writer [String])))
-type Compiler a = StateT Scope Generator a
-
-data Scope = Scope {
-    varscope :: VarScope,
-    extends :: Map.Map String [PDatatype],
-    typeMethods :: Map.Map String [Function],
-    counter :: Int,
-    definedStructs :: [String]
-}
-
-data VarScope = VarScope {
-    functionName :: String,
-    variables :: Map.Map String PDatatype,
-    expectedReturnType :: PDatatype
-}
-
-putVar :: String -> PDatatype -> Compiler ()
-putVar name dtype = do scope <- get
-                       let vscope = varscope scope
-                           m = variables vscope
-                           m' = Map.insert name dtype m
-                       put scope { varscope = vscope { variables = m' } }
-
-saveScope :: Compiler VarScope
-saveScope = do scope <- get
-               return $ varscope scope
-
-restoreScope :: VarScope -> Compiler ()
-restoreScope vscope = do scope <- get
-                         put scope { varscope = vscope }
-
-getVar :: String -> Compiler (Maybe PDatatype)
-getVar name = do scope <- get
-                 return $ Map.lookup name $ variables $ varscope scope
-
-getVarOrError :: String -> Compiler PDatatype
-getVarOrError name = do t <- getVar name
-                        case t of
-                            Just dt -> return dt
-                            Nothing -> do tellError ("Variable not found: " ++ name)
-                                          return PNothing
-
-getExpectedReturnType :: Compiler PDatatype
-getExpectedReturnType = do scope <- get
-                           return $ expectedReturnType $ varscope scope
-
-getCurrentFunctionName :: Compiler String
-getCurrentFunctionName = do scope <- get
-                            return $ functionName $ varscope scope
-
-getModelMethods :: PDatatype -> Compiler [Function]
-getModelMethods (PInterface a _)
-    = do scope <- get
-         case Map.lookup a $ typeMethods scope of
-            Just ms -> return ms
-            Nothing -> return []
-
-getExtends :: PDatatype -> Compiler [PDatatype]
-getExtends (PInterface a ts)
-    = do scope <- get
-         let ms = fromMaybe [] (Map.lookup a $ extends scope)
-         return ms
-
-getDTypeMethods :: PDatatype -> Compiler [Function]
-getDTypeMethods dt
-    = do ms <- getExtends dt
-         mms <- mapM getModelMethods ms
-         return $ concat mms
-
-searchMethod :: [Function] -> String -> Maybe Function
-searchMethod ms m
-    = let fms = filter (\m' -> name m' == m) ms
-      in case fms of
-            []    -> Nothing
-            (a:_) -> Just a
-
-getModelMethod :: PDatatype -> String -> Compiler (Maybe Function)
-getModelMethod dt m
-    = do ms <- getModelMethods dt
-         return $ searchMethod ms m
-
-getDTypeMethod :: PDatatype -> String -> Compiler (Maybe Function)
-getDTypeMethod dt m
-    = do ms <- getDTypeMethods dt
-         return $ searchMethod ms m
-
-nextNum :: Compiler Int
-nextNum = do scope <- get
-             let num = counter scope
-             put scope { counter = num+1 }
-             return num
-
-tmpVar :: Compiler String
-tmpVar = do id <- nextNum
-            return ("tmp" ++ show id)
+import Util
+import Datatype
+import Scope
 
 -- Koodingeneroiminen
 
@@ -170,11 +17,6 @@ generateFunction rtype name params
     = do let paramS = joinColon $ map (\(n,t) -> ctype t n) params
              name' = name ++ "(" ++ paramS ++ ")"
          lift $ tell [ctype rtype name', "{\n"]
-
-joinColon :: [String] -> String
-joinColon [] = ""
-joinColon [p] = p
-joinColon (p:ps) = p ++ (',':joinColon ps)
 
 generateIf :: String -> Compiler ()
 generateIf cond
@@ -204,6 +46,15 @@ generateCreate dt var value
                         put scope { definedStructs = n : definedStructs scope }
                         lift $ generateSuperHeaderCode
                             ("struct "++n++"{int len;" ++ ctype a "*arr" ++ ";};\n")
+                     )
+            dt@(PSum dts)
+                -> do
+                    let n = pdt2str dt
+                    scope <- get
+                    unless (n `elem` definedStructs scope) (do
+                        put scope { definedStructs = n : definedStructs scope }
+                        methods <- concat <$> mapM getModelMethods dts
+                        compileStruct n methods
                      )
             _   -> return ()
 
@@ -245,32 +96,41 @@ generateSuperHeaderCode code
 
 -- Apufunktioita tyyppien tarkistamiseen ja virheisiin
 
-tellError :: String -> Compiler ()
-tellError msg = do fname <- getCurrentFunctionName
-                   lift . lift . lift . lift $ tell ["Error in " ++ fname ++ ": " ++ msg]
-
 typemismatch :: PDatatype -> PDatatype -> Compiler ()
 typemismatch right wrong
     -- PNothing on virheellisten lausekkeiden tyyppi -> virhe on jo tulostettu
     = unless (right == PNothing || wrong == PNothing)
-        (tellError ("type mismatch: expected " ++ show right ++ ", got " ++ show wrong))
+        (tellError ("type mismatch: can't cast " ++ pdt2str wrong ++ "to " ++ pdt2str right))
 
 checktype :: String -> String -> PDatatype -> PDatatype -> Compiler ()
 
+checktype v f right cand@(PSum dts)
+    = do unless (cand == right) (typemismatch right cand)
+         generateCreate right v f
+checktype v f right@(PSum dts) cand
+    = do generateCreate right v ("alloc(sizeof(struct "++pdt2str right++"))")
+         ms <- concat <$> mapM getModelMethods dts
+         forM_ ms (\m ->
+            generateAssign (v++"->"++name m) (pdt2str cand++'_':pdt2str right++'_':name m)
+          )
+         generateAssign (v++"->_obj") ("alloc(sizeof("++ctype cand ""++"))")
+         generateAssign ("*("++ctype cand "*"++")"++v++"->_obj") f
 checktype v f right cand
     = do es <- getExtends cand
          if right `elem` es
             then do generateCreate right v ("alloc(sizeof(struct "++pdt2str right++"))")
                     ms <- getModelMethods right
                     forM_ ms (\m ->
-                        generateAssign (v++"->"++name m) (pdt2str cand++'_':name m)
+                        generateAssign (v++"->"++name m)
+                            (pdt2str cand++'_':pdt2str right++'_':name m)
                      )
                     generateAssign (v++"->_obj") ("alloc(sizeof("++ctype cand ""++"))")
                     generateAssign ("*("++ctype cand "*"++")"++v++"->_obj") f
             else case (right, cand) of
                 (PInterface "List" [t], PInterface "List" [u])
                     -> do generateCreate right v
-                            ('{': f ++ ".len, alloc(" ++ f ++ ".len*sizeof(" ++ ctype right "" ++ "))}")
+                            ('{': f ++ ".len, alloc(" ++ f ++ ".len*sizeof("
+                                ++ ctype right "" ++ "))}")
                           generateAssign (v++".len") (f++".len")
                           ctr <- tmpVar
                           generateCreate pInteger ctr "0"
@@ -325,14 +185,6 @@ compile decls = do let pvars = map decl2pvar
                    runStateT (rec (mapM (compileDecl pvars)) decls) scope
                    return ()
 
-collapse :: (Ord k) => [(k, a)] -> Map.Map k [a]
-collapse = foldr (\(k, v) m -> Map.insert k (v : fromMaybe [] (Map.lookup k m)) m) Map.empty
-
-rec :: (Monad m) => ([a] -> m [[a]]) -> [a] -> m()
-rec f [] = return ()
-rec f a  = do v <- f a
-              rec f (concat v)
-
 -- Kääntää yksittäisen funktion
 
 compileDecl :: [PVariable] -> Declaration
@@ -357,44 +209,57 @@ compileDecl pvars (Func func) =
           compileStatement $ body func
           generateEnd
           return []
-compileDecl _ (Mdl m) =
-    do lift $ generateHeaderCode ("struct " ++ modelName m ++ "{\n")
-       forM_ (methods m) (\f ->
-            let r = dt2pdt (returnType f) `ifDollar` PInterface (modelName m) []
-                ps = PInterface (modelName m) [] : map (dt2pdt.snd) (parameters f)
-            in lift $ generateHeaderCode("    " ++
-                ctype r ('(':'*':name f ++ ")(" ++ cparams ps ++ ")") ++ ";\n"))
-       lift $ generateHeaderCode "    void *_obj;\n};\n"
-       return []
+compileDecl _ (Mdl m) = do
+    compileStruct (modelName m) (methods m)
+    return []
 compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
-    forM fs (\f -> do
+    concat <$> forM fs (\f -> do
         mf' <- getModelMethod (dt2pdt m) (name f)
         if isNothing mf'
             then do tellError ("Invalid extension of " ++ n ++ " with "
                             ++ name f ++ "(): no such method")
-                    return $ Func f -- palautetaan jotain tyhmää, virheen vuoksi mitään
-                                    -- järkevää ei voi palauttaa
-            else do
-                let (Just mf) = mf'
-                    mr = dt2pdt $ returnType mf
-                    r = dt2pdt $ returnType f
-                    ps = ctype (dt2pdt m) "this"
-                        : map (\(n,d) -> ctype (dt2pdt d) n) (parameters f)
-                    ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)")
-                        : map fst (parameters f)
-                    signature = ctype (mr `ifDollar` dt2pdt m)
-                        (n ++ "_" ++ name f ++ "(" ++ joinColon ps ++ ")")
-                lift $ generateHeaderCode (signature ++ ";\n")
-                lift $ generateCode (signature ++ " {\n")
-                generateCreate r "_ret" ("_" ++ n ++ "_" ++ name f ++ "(" ++ joinColon ps' ++ ")")
-                checktype "_ret2" "_ret" (mr `ifDollar` dt2pdt m) r
-                generateReturn "_ret2"
-                lift $ generateCode "\n}\n"
-                return (Func f {
+                    return [] -- Mitään järkevää ei voi palauttaa
+            else let (Just mf) = mf' in do
+                models <- getExtends (PInterface n [])
+                let combs = combinations models
+                forM_ combs (\comb -> do
+                    let t = case comb of
+                            [c]  -> c
+                            list -> PSum list
+                    compileStructMethod t mf n f
+                 )
+                return [Func f {
                     name = '_' : n ++ "_" ++ name f,
                     parameters = ("this", Typename n []) : parameters f
-                })
+                }]
     )
+
+compileStruct :: String -> [Function] -> Compiler ()
+compileStruct mname methods = do
+    lift $ generateHeaderCode ("struct " ++ mname ++ "{\n")
+    forM_ methods (\f ->
+        let r = dt2pdt (returnType f) `ifDollar` PInterface mname []
+            ps = PInterface mname [] : map (dt2pdt.snd) (parameters f)
+        in lift $ generateHeaderCode("    " ++
+            ctype r ('(':'*':name f ++ ")(" ++ cparams ps ++ ")") ++ ";\n"))
+    lift $ generateHeaderCode "    void *_obj;\n};\n"
+
+compileStructMethod :: PDatatype -> Function -> String -> Function -> Compiler ()
+compileStructMethod m mf n f = do
+    let mr = dt2pdt $ returnType mf
+        r = dt2pdt $ returnType f
+        ps = ctype m "this"
+            : map (\(n,d) -> ctype (dt2pdt d) n) (parameters f)
+        ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)")
+            : map fst (parameters f)
+        signature = ctype (mr `ifDollar` m)
+            (n ++ "_" ++ pdt2str m ++ "_" ++ name f ++ "(" ++ joinColon ps ++ ")")
+    lift $ generateHeaderCode (signature ++ ";\n")
+    lift $ generateCode (signature ++ " {\n")
+    generateCreate r "_ret" ("_" ++ n ++ "_" ++ name f ++ "(" ++ joinColon ps' ++ ")")
+    checktype "_ret2" "_ret" (mr `ifDollar` m) r
+    generateReturn "_ret2"
+    lift $ generateCode "\n}\n"
 
 -- Lauseiden kääntäjät
 
@@ -550,14 +415,29 @@ compileMethodCall v obj (PInterface "List" [dt]) method args
              generateAssign (obj ++ ".arr["++index++"]") value
              generateCreate dt v value
              return dt
+    | method == "length"
+        = do checkargs [] args
+             generateCreate pInteger v (obj ++ ".len")
+             return pInteger
 -- Määrittelemättömät metodit
+compileMethodCall v obj dt@(PSum dts) method args
+    = do ms <- mapM (\dt -> do f <- getModelMethod dt method;
+                               return $ do {f' <- f; return (dt, f') } ) dts
+         let m = firstJust ms
+         case m of
+            Nothing -> do
+                tellError ("type " ++ pdt2str dt ++ " does not have method `" ++ method ++ "'")
+                return PNothing
+            Just (dt', m') ->
+                compileMethodCall' v m' (obj++"->"++method) obj dt args
 compileMethodCall v obj dt method args
     = do m <- getDTypeMethod dt method
          case m of
             Nothing -> do p <- getModelMethod dt method
                           case p of
                             Nothing -> do
-                                tellError ("type " ++ show dt ++ " does not have method `" ++ method ++ "'")
+                                tellError ("type " ++ pdt2str dt
+                                    ++ " does not have method `" ++ method ++ "'")
                                 return PNothing
                             Just p' ->
                                 compileMethodCall' v p' (obj++"->"++method) obj dt args

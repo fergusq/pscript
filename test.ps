@@ -42,13 +42,13 @@ Int[] fromTo(Int from, Int to) {
 	return list;
 }
 
-Void shout(Printable p) {
-	p.print();
-	p.print();
-	p.print();
+Void shout(Printable&Squarable p) {
+	p.square().print();
+	p.square().print();
+	p.square().print();
 }
 
-Void shoutAll(Printable[] ps) {
+Void shoutAll(Printable&Squarable[] ps) {
 	for (p in ps) shout(p);
 }
 

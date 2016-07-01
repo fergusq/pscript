@@ -29,6 +29,7 @@ data Token
 	| TokenCW
 	| TokenC
 	| TokenSC
+	| TokenAmp
 	| TokenPipe
 	| TokenArrow
 	| TokenEqEq
@@ -67,6 +68,7 @@ lexer (',':cs) = TokenC : lexer cs
 lexer (';':cs) = TokenSC : lexer cs
 lexer ('&':'&':cs) = TokenAnd : lexer cs
 lexer ('|':'|':cs) = TokenOr : lexer cs
+lexer ('&':cs) = TokenAmp : lexer cs
 lexer ('|':cs) = TokenPipe : lexer cs
 lexer ('.':cs) = TokenDot : lexer cs
 lexer ('$':cs) = TokenDollar : lexer cs
