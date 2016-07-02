@@ -42,6 +42,7 @@ data Token
 	| TokenOr
 	| TokenDot
 	| TokenDollar
+	| TokenAt
 	deriving Show
 
 lexer :: String -> [Token]
@@ -72,6 +73,7 @@ lexer ('&':cs) = TokenAmp : lexer cs
 lexer ('|':cs) = TokenPipe : lexer cs
 lexer ('.':cs) = TokenDot : lexer cs
 lexer ('$':cs) = TokenDollar : lexer cs
+lexer ('@':cs) = TokenAt : lexer cs
 lexer ('"':cs) = lexString "" cs
 lexer (c:cs)
 	| isSpace c = lexer cs

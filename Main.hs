@@ -54,7 +54,7 @@ generateCreate dt var value
                     unless (n `elem` definedStructs scope) (do
                         put scope { definedStructs = n : definedStructs scope }
                         methods <- concat <$> mapM getModelMethods dts
-                        compileStruct n methods
+                        compileStruct dt n methods
                      )
             _   -> return ()
 
@@ -108,24 +108,11 @@ checktype v f right cand@(PSum dts)
     = do unless (cand == right) (typemismatch right cand)
          generateCreate right v f
 checktype v f right@(PSum dts) cand
-    = do generateCreate right v ("alloc(sizeof(struct "++pdt2str right++"))")
-         ms <- concat <$> mapM getModelMethods dts
-         forM_ ms (\m ->
-            generateAssign (v++"->"++name m) (pdt2str cand++'_':pdt2str right++'_':name m)
-          )
-         generateAssign (v++"->_obj") ("alloc(sizeof("++ctype cand ""++"))")
-         generateAssign ("*("++ctype cand "*"++")"++v++"->_obj") f
+    = createModelObject v f right dts cand
 checktype v f right cand
     = do es <- getExtends cand
          if right `elem` es
-            then do generateCreate right v ("alloc(sizeof(struct "++pdt2str right++"))")
-                    ms <- getModelMethods right
-                    forM_ ms (\m ->
-                        generateAssign (v++"->"++name m)
-                            (pdt2str cand++'_':pdt2str right++'_':name m)
-                     )
-                    generateAssign (v++"->_obj") ("alloc(sizeof("++ctype cand ""++"))")
-                    generateAssign ("*("++ctype cand "*"++")"++v++"->_obj") f
+            then createModelObject v f right [right] cand
             else case (right, cand) of
                 (PInterface "List" [t], PInterface "List" [u])
                     -> do generateCreate right v
@@ -143,6 +130,24 @@ checktype v f right cand
                 _
                     -> do unless (cand == right) (typemismatch right cand)
                           generateCreate right v f
+
+createModelObject :: String -> String -> PDatatype -> [PDatatype]
+                     -> PDatatype -> Compiler ()
+createModelObject v f dt models from = do
+    generateCreate dt v ("alloc(sizeof(struct "++pdt2str dt++"))")
+    ms <- concat <$> mapM getModelMethods models
+    forM_ ms $ \m ->
+        generateAssign (v++"->"++name m) (pdt2str from++'_':pdt2str dt++'_':name m)
+    when (length models > 1) $ forM_ (combinations models) $ \c -> do
+        var <- tmpVar
+        createModelObject var f (sumOrModel c) c from
+        generateAssign (v++"->"++concatMap pdt2str c) var
+    generateAssign (v++"->_obj") ("alloc(sizeof("++ctype from ""++"))")
+    generateAssign ("*("++ctype from "*"++")"++v++"->_obj") f
+
+sumOrModel :: [PDatatype] -> PDatatype
+sumOrModel [t] = t
+sumOrModel ts = PSum ts
 
 checkargs :: [PDatatype] -> [Expression] -> Compiler [String]
 checkargs paramTs args = if length paramTs /= length args
@@ -164,10 +169,12 @@ compile decls = do let pvars = map decl2pvar
                         $ concatMap (\d -> case d of Func f -> [f]
                                                      _     -> []) decls
                    let models = Map.fromList $
-                                concatMap (\d -> case d of Mdl m -> [(modelName m, methods m)]
-                                                           _     -> []) decls
-                   let extends = concatMap (\d -> case d of Ext e -> [(dtName e, dt2pdt $ model e)]
-                                                            _     -> []) decls
+                                concatMap (\d -> case d of
+                                    Mdl m -> [(modelName m, m)]
+                                    _     -> []) decls
+                   let extends = concatMap (\d -> case d of
+                                    Ext e -> [(dtName e, dt2pdt $ model e)]
+                                    _     -> []) decls
                    let supers = collapse extends
                    generateHeaderCode "#include <stdlib.h>\n"
                    generateHeaderCode "void * alloc(size_t x) { return malloc(x); }\n"
@@ -210,7 +217,8 @@ compileDecl pvars (Func func) =
           generateEnd
           return []
 compileDecl _ (Mdl m) = do
-    compileStruct (modelName m) (methods m)
+    let mname = modelName m
+    compileStruct (PInterface mname []) mname (methods m) --TODO
     return []
 compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
     concat <$> forM fs (\f -> do
@@ -220,7 +228,7 @@ compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
                             ++ name f ++ "(): no such method")
                     return [] -- Mitään järkevää ei voi palauttaa
             else let (Just mf) = mf' in do
-                models <- getExtends (PInterface n [])
+                models <- getExtends (PInterface n []) -- TODO
                 let combs = combinations models
                 forM_ combs (\comb -> do
                     let t = case comb of
@@ -234,14 +242,19 @@ compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
                 }]
     )
 
-compileStruct :: String -> [Function] -> Compiler ()
-compileStruct mname methods = do
+compileStruct :: PDatatype -> String -> [Function] -> Compiler ()
+compileStruct dt mname methods = do
     lift $ generateHeaderCode ("struct " ++ mname ++ "{\n")
-    forM_ methods (\f ->
-        let r = dt2pdt (returnType f) `ifDollar` PInterface mname []
-            ps = PInterface mname [] : map (dt2pdt.snd) (parameters f)
-        in lift $ generateHeaderCode("    " ++
-            ctype r ('(':'*':name f ++ ")(" ++ cparams ps ++ ")") ++ ";\n"))
+    forM_ methods $ \f ->
+        let r = dt2pdt (returnType f) `ifDollar` dt
+            ps = dt : map (dt2pdt.snd) (parameters f)
+        in lift $ generateHeaderCode ("    " ++
+            ctype r ('(':'*':name f ++ ")(" ++ cparams ps ++ ")") ++ ";\n")
+    case dt of
+        PSum dts -> forM_ (combinations dts) $ \c ->
+            lift $ generateHeaderCode ("    " ++ ctype (sumOrModel c) (concatMap pdt2str c)
+                                       ++ ";\n")
+        _ -> return ()
     lift $ generateHeaderCode "    void *_obj;\n};\n"
 
 compileStructMethod :: PDatatype -> Function -> String -> Function -> Compiler ()
@@ -250,7 +263,7 @@ compileStructMethod m mf n f = do
         r = dt2pdt $ returnType f
         ps = ctype m "this"
             : map (\(n,d) -> ctype (dt2pdt d) n) (parameters f)
-        ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)")
+        ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)") -- TODO
             : map fst (parameters f)
         signature = ctype (mr `ifDollar` m)
             (n ++ "_" ++ pdt2str m ++ "_" ++ name f ++ "(" ++ joinColon ps ++ ")")
@@ -401,7 +414,14 @@ compileMethodCall v obj (PInterface "Int" []) method args
     | method == "==" || method == "!=" || method == "<" || method == ">"
         || method == "<=" || method == ">="
         = do (var:vars) <- checkargs [pInteger] args
-             generateCreate pInteger v (obj++method++var)
+             generateCreate pBool v (obj++method++var)
+             return pBool
+
+-- PInteger
+compileMethodCall v obj (PInterface "Int" []) method args
+    | method == "&&" || method == "||"
+        = do (var:vars) <- checkargs [pBool] args
+             generateCreate pBool v (obj++method++var)
              return pBool
 
 -- PList

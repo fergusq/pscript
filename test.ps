@@ -1,6 +1,25 @@
 extern Void printf(Str s, Int i);
+extern Void sprintf(Str to, Str format, Int i);
+extern Void puts(Str s);
 
 Void printInt(Int i) { printf("%d\n", i); }
+
+model String {
+	Str toString();
+}
+
+extend Str with String {
+	Str toString() {
+		return this;
+	}
+}
+
+extend Int with String {
+	Str toString() {
+		var todo = "<TODO>";
+		return todo;
+	}
+}
 
 model Printable {
 	Void print();
@@ -9,6 +28,12 @@ model Printable {
 extend Int with Printable {
 	Void print() {
 		printInt(this);
+	}
+}
+
+extend Str with Printable {
+	Void print() {
+		puts(this);
 	}
 }
 
@@ -29,6 +54,16 @@ model Duplicable {
 extend Int with Duplicable {
 	Int[] duplicate() {
 		return [this, this];
+	}
+}
+
+model Appendable<@T> {
+	$ append(@T element);
+}
+
+extend Int with Appendable<Int> {
+	Int append(Int i) {
+		return this + i;
 	}
 }
 
@@ -53,7 +88,7 @@ Void shoutAll(Printable&Squarable[] ps) {
 }
 
 Void main() {
-	var arr = fromTo(1, 4);
+	var arr = fromTo(1, 4.append(2));
 	for (i in arr) i.square().print();
 	shoutAll(arr);
 	shoutAll(10.duplicate());

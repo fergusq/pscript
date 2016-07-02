@@ -41,5 +41,8 @@ firstJust (Just a:as)  = Just a
 firstJust (Nothing:as) = firstJust as
 
 combinations :: (Eq a, Ord a) => [a] -> [[a]]
-combinations xs = [1..length xs] >>= \n ->
-    filter ((n==).length.nub) $ nub $ map sort $ mapM (const xs) [1..n]
+combinations xs = nub $ map sort $ do n <- [1..length xs]
+                                      let sublist = take (n-1) xs ++ drop n xs
+                                      if null sublist
+                                       then []
+                                       else sublist:combinations sublist

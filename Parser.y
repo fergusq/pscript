@@ -40,6 +40,7 @@ import Lexer
 	'.'		{ TokenDot }
 	'$'		{ TokenDollar }
 	'&'		{ TokenAmp }
+	'@'		{ TokenAt }
 	arrow		{ TokenArrow }
 	eq		{ TokenEqEq }
 	neq		{ TokenNeq }
@@ -58,7 +59,13 @@ Decl	: Func				{ Func $1 }
 	| Model				{ Mdl $1 }
 	| Extend			{ Ext $1 }
 
-Model	: model var '{' EFuncs '}'	{ Model { modelName = $2, methods = $4 } }
+Model	: model var '{' EFuncs '}'	{ Model { modelName = $2, typeparameters = [], methods = $4 } }
+	| model var '<' TParams '>' '{' EFuncs '}' { Model { modelName = $2, typeparameters = $4, methods = $7 } }
+
+
+TParams	: '@' var ',' TParams		{ ($2 : $4) }
+	| '@' var			{ [$2] }
+
 Extend	: extend var with Datatype '{' Funcs '}' { Extend { dtName = $2, model = $4, eMethods = $6 } }
 
 Funcs	: Func Funcs			{ ($1 : $2) }
@@ -81,6 +88,7 @@ Parameter : Datatype var		{ ($2, $1) }
 
 Datatype: PrimDT			{ $1 }
 	| '$'				{ DollarType }
+	| '@' var			{ Typeparam $2 }
 	| PrimDT '&' SumDT		{ SumType ($1:$3) }
 	| Datatype '[' ']'		{ Typename "List" [$1] }
 	| Datatype arrow Datatype	{ Typename "Func" [$3, $1] }
@@ -91,8 +99,9 @@ SumDT	: PrimDT '&' SumDT		{ ($1 : $3) }
 	| PrimDT			{ [$1] }
 
 PrimDT	: var				{ Typename $1 [] }
+	| var '<' DtList '>'		{ Typename $1 $3 }
 
-DtList	: Datatype DtList		{ ($1 : $2) }
+DtList	: Datatype ',' DtList		{ ($1 : $3) }
 	| Datatype			{ [$1] }
 
 Stmt	: Call ';'			{ Expr $1 }
@@ -163,6 +172,7 @@ data Declaration =
 
 data Model = Model {
 	modelName :: String,
+	typeparameters :: [String],
 	methods :: [Function]
 } deriving Show
 
@@ -182,6 +192,7 @@ data Function = Function {
 data Datatype
 	= Typename String [Datatype]
 	| SumType [Datatype]
+	| Typeparam String
 	| DollarType deriving Show
 
 data Statement
