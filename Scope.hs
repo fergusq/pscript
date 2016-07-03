@@ -16,7 +16,9 @@ data Scope = Scope {
     extends :: Map.Map String [PDatatype],
     models :: Map.Map String Model,
     counter :: Int,
-    definedStructs :: [String]
+    definedStructs :: [String],
+    definedMethods :: [String],
+    generatorQueue :: [Compiler ()]
 }
 
 data VarScope = VarScope {
@@ -66,9 +68,7 @@ getSubstitutions dt@(PInterface n ts) = do
     case Map.lookup n m of
         Just model ->
             let tps = typeparameters model
-            in do
-             --tellError $ show (Map.fromList (zip tps ts))
-             return $ Map.fromList (zip tps ts)
+            in return $ Map.fromList (zip tps ts)
         Nothing -> return Map.empty
 
 getModelMethods :: PDatatype -> Compiler [FSignature]
@@ -78,6 +78,9 @@ getModelMethods dt@(PInterface a _)
          case Map.lookup a $ models scope of
             Just m -> mapM (subsFunction ss) $ methods m
             Nothing -> return []
+
+getModelMethods dt@(PSum dts)
+    = concat <$> mapM getModelMethods dts
 
 getExtends :: PDatatype -> Compiler [PDatatype]
 getExtends (PInterface a ts)
@@ -118,16 +121,28 @@ tmpVar :: Compiler String
 tmpVar = do id <- nextNum
             return ("tmp" ++ show id)
 
-conditionallyCreate :: String -> Compiler () -> Compiler ()
-conditionallyCreate n callback = do
+conditionallyCreateStruct :: String -> Compiler () -> Compiler ()
+conditionallyCreateStruct n callback = do
     scope <- get
     unless (n `elem` definedStructs scope) $ do
         put scope { definedStructs = n : definedStructs scope }
         callback
 
+conditionallyCreateMethod :: String -> Compiler () -> Compiler ()
+conditionallyCreateMethod n callback = do
+    scope <- get
+    unless (n `elem` definedMethods scope) $ do
+        put scope { definedMethods = n : definedMethods scope }
+        callback
+
 tellError :: String -> Compiler ()
 tellError msg = do fname <- getCurrentFunctionName
                    lift . lift . lift . lift $ tell ["Error in " ++ fname ++ ": " ++ msg]
+
+generateLater :: Compiler () -> Compiler ()
+generateLater code = do
+    scope <- get
+    put scope { generatorQueue = code : generatorQueue scope }
 
 data FSignature = FSignature {
     sname :: String,

@@ -117,8 +117,9 @@ createModelObject :: String -> String -> PDatatype -> [PDatatype]
 createModelObject v f dt models from = do
     generateCreate dt v ("alloc(sizeof(struct "++pdt2str dt++"))")
     ms <- concat <$> mapM getModelMethods models
-    forM_ ms $ \m ->
+    forM_ ms $ \m -> do
         generateAssign (v++"->"++sname m) (pdt2str from++'_':pdt2str dt++'_':sname m)
+        ensureMethodIsDefined from dt (sname m)
     when (length models > 1) $ forM_ (combinations models) $ \c -> do
         var <- tmpVar
         createModelObject var f (sumOrModel c) c from
@@ -148,50 +149,69 @@ ensureStructIsDefined dt =
     case dt of
         PInterface "List" [a] -> do
             let n = "List1" ++ pdt2str a
-            conditionallyCreate n $
+            conditionallyCreateStruct n $
                 lift $ generateSuperHeaderCode
                     ("struct "++n++"{int len;" ++ ctype a "*arr" ++ ";};\n")
         dt@(PInterface t as@(p:ps)) -> do
             let n = pdt2str dt
-            conditionallyCreate n $ do
+            conditionallyCreateStruct n $ do
                 methods <- getModelMethods dt
                 compileStruct dt n methods
         dt@(PSum dts) -> do
             let n = pdt2str dt
-            conditionallyCreate n $ do
+            conditionallyCreateStruct n $ do
                 methods <- concat <$> mapM getModelMethods dts
                 compileStruct dt n methods
         _   -> return ()
 
+ensureMethodIsDefined :: PDatatype -> PDatatype -> String -> Compiler ()
+ensureMethodIsDefined dt model fname = do
+    mf' <- getModelMethod model fname
+    let PInterface name [] = dt
+    case mf' of
+        Just mf -> conditionallyCreateMethod
+            (fname ++ "_" ++ pdt2str model ++ "_" ++ sname mf) $
+            compileStructMethod model mf name
+        Nothing -> tellError ("Unknown method `" ++ fname ++ "'")
+
 -- Pääfunktio
 
 compile :: [Declaration] -> Generator ()
-compile decls = do let pvars = map decl2pvar
-                        $ concatMap (\d -> case d of Func f -> [f]
-                                                     _     -> []) decls
-                   let models = Map.fromList $
-                                concatMap (\d -> case d of
-                                    Mdl m -> [(modelName m, m)]
+compile decls = do
+    let pvars = map decl2pvar
+                    $ concatMap (\d -> case d of
+                                    Func f -> [f]
                                     _     -> []) decls
-                   let extends = concatMap (\d -> case d of
-                                    Ext e -> [(dtName e, dt2pdt $ model e)]
-                                    _     -> []) decls
-                   let supers = collapse extends
-                   generateHeaderCode "#include <stdlib.h>\n"
-                   generateHeaderCode "void * alloc(size_t x) { return malloc(x); }\n"
-                   let scope = Scope {
-                      varscope = VarScope {
-                        functionName = "",
-                        variables = Map.empty,
-                        expectedReturnType = PNothing
-                      },
-                      counter = 0,
-                      extends = supers,
-                      models = models,
-                      definedStructs = []
-                   }
-                   runStateT (rec (mapM (compileDecl pvars)) decls) scope
-                   return ()
+    let models = Map.fromList $
+                concatMap (\d -> case d of
+                    Mdl m -> [(modelName m, m)]
+                    _     -> []) decls
+    let extends = concatMap (\d -> case d of
+                    Ext e -> [(dtName e, dt2pdt $ model e)]
+                    _     -> []) decls
+    let supers = collapse extends
+    generateHeaderCode "#include <stdlib.h>\n"
+    generateHeaderCode "#include <gc.h>\n"
+    generateHeaderCode "void * alloc(size_t x) { return GC_malloc(x); }\n"
+    let scope = Scope {
+      varscope = VarScope {
+        functionName = "",
+        variables = Map.empty,
+        expectedReturnType = PNothing
+      },
+      counter = 0,
+      extends = supers,
+      models = models,
+      definedStructs = [],
+      definedMethods = [],
+      generatorQueue = []
+    }
+    runStateT (do
+        rec (mapM (compileDecl pvars)) decls
+        scope' <- get
+        forM_ (generatorQueue scope') id
+     ) scope
+    return ()
 
 -- Kääntää yksittäisen funktion
 
@@ -233,16 +253,7 @@ compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) = do
             then do tellError ("Invalid extension of " ++ n ++ " with "
                             ++ name f ++ "(): no such method")
                     return [] -- Mitään järkevää ei voi palauttaa
-            else let (Just mf) = mf' in do
-                models <- getExtends (PInterface n []) -- TODO
-                let combs = combinations models
-                forM_ combs (\comb -> do
-                    let t = case comb of
-                            [c]  -> c
-                            list -> PSum list
-                    sfs <- subsFunction ss f
-                    compileStructMethod t mf n sfs
-                 )
+            else let (Just mf) = mf' in
                 return [Func f {
                     name = '_' : n ++ "_" ++ name f,
                     parameters = ("this", Typename n []) : parameters f
@@ -263,22 +274,24 @@ compileStruct dt mname methods = do
         _ -> return ()
     lift $ generateHeaderCode "    void *_obj;\n};\n"
 
-compileStructMethod :: PDatatype -> FSignature -> String -> FSignature -> Compiler ()
-compileStructMethod m mf n f = do
-    let mr = sreturnType mf
-        r = sreturnType f
+compileStructMethod :: PDatatype -> FSignature -> String -> Compiler ()
+compileStructMethod m mf n = do
+    let dt = PInterface n [] -- TODO
+        mr = sreturnType mf `ifDollar` m
+        r = sreturnType mf `ifDollar` dt
         ps = ctype m "this"
-            : map (\(n,d) -> ctype d n) (sparameters f)
-        ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)") -- TODO
-            : map fst (sparameters f)
-        signature = ctype (mr `ifDollar` m)
-            (n ++ "_" ++ pdt2str m ++ "_" ++ sname f ++ "(" ++ joinColon ps ++ ")")
+            : map (\(n,d) -> ctype d n) (sparameters mf)
+        ps' = ("*(("++ctype dt "*" ++")this->_obj)")
+            : map fst (sparameters mf)
+        signature = ctype mr
+            (n ++ "_" ++ pdt2str m ++ "_" ++ sname mf ++ "(" ++ joinColon ps ++ ")")
     lift $ generateHeaderCode (signature ++ ";\n")
-    lift $ generateCode (signature ++ " {\n")
-    generateCreate r "_ret" ("_" ++ n ++ "_" ++ sname f ++ "(" ++ joinColon ps' ++ ")")
-    checktype "_ret2" "_ret" (mr `ifDollar` m) r
-    generateReturn "_ret2"
-    lift $ generateCode "\n}\n"
+    generateLater $ do
+        lift $ generateCode (signature ++ " {\n")
+        generateCreate r "_ret" ("_" ++ n ++ "_" ++ sname mf ++ "(" ++ joinColon ps' ++ ")")
+        checktype "_ret2" "_ret" mr r
+        generateReturn "_ret2"
+        lift $ generateCode "\n}\n"
 
 -- Lauseiden kääntäjät
 
