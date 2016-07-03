@@ -1,22 +1,9 @@
------------------------------------------------------------------------------
---
--- Module      :  Datatype
--- Copyright   :
--- License     :  AllRightsReserved
---
--- Maintainer  :
--- Stability   :
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 module Datatype where
 
 import Parser
 import Util
 import Data.List
+import qualified Data.Map as Map
 
 type PVariable = (String, PDatatype)
 
@@ -64,8 +51,8 @@ ctype (PInterface "Int" []) n = "int " ++ n
 ctype (PInterface "Bool" []) n = "int " ++ n
 ctype (PInterface "Str" []) n = "char*" ++ n
 ctype (PInterface "Void" []) n = "char " ++ n
-ctype PNothing n = "void*" ++ n
-ctype (PInterface a _) n = "struct " ++ a ++ ('*':n)
+ctype PNothing n = "NOTHING " ++ n
+ctype dt@(PInterface a ts) n = "struct " ++ pdt2str dt ++ ('*':n)
 ctype dt@(PSum dts) n = "struct " ++ pdt2str dt ++ ('*':n)
 
 cparams :: [PDatatype] -> String

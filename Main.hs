@@ -37,26 +37,7 @@ generateEnd
 generateCreate :: PDatatype -> String -> String -> Compiler ()
 generateCreate dt var value
     = do lift $ tell ["    ", ctype dt var,"=",value,";\n"]
-         case dt of
-            PInterface "List" [a]
-                -> do
-                    let n = "List1" ++ pdt2str a
-                    scope <- get
-                    unless (n `elem` definedStructs scope) (do
-                        put scope { definedStructs = n : definedStructs scope }
-                        lift $ generateSuperHeaderCode
-                            ("struct "++n++"{int len;" ++ ctype a "*arr" ++ ";};\n")
-                     )
-            dt@(PSum dts)
-                -> do
-                    let n = pdt2str dt
-                    scope <- get
-                    unless (n `elem` definedStructs scope) (do
-                        put scope { definedStructs = n : definedStructs scope }
-                        methods <- concat <$> mapM getModelMethods dts
-                        compileStruct dt n methods
-                     )
-            _   -> return ()
+         ensureStructIsDefined dt
 
 generateAssign :: String -> String -> Compiler ()
 generateAssign var value
@@ -137,7 +118,7 @@ createModelObject v f dt models from = do
     generateCreate dt v ("alloc(sizeof(struct "++pdt2str dt++"))")
     ms <- concat <$> mapM getModelMethods models
     forM_ ms $ \m ->
-        generateAssign (v++"->"++name m) (pdt2str from++'_':pdt2str dt++'_':name m)
+        generateAssign (v++"->"++sname m) (pdt2str from++'_':pdt2str dt++'_':sname m)
     when (length models > 1) $ forM_ (combinations models) $ \c -> do
         var <- tmpVar
         createModelObject var f (sumOrModel c) c from
@@ -161,6 +142,26 @@ checkargs paramTs args = if length paramTs /= length args
                                                 var' <- tmpVar
                                                 checktype var' var t vt
                                                 return var')
+
+ensureStructIsDefined :: PDatatype -> Compiler ()
+ensureStructIsDefined dt =
+    case dt of
+        PInterface "List" [a] -> do
+            let n = "List1" ++ pdt2str a
+            conditionallyCreate n $
+                lift $ generateSuperHeaderCode
+                    ("struct "++n++"{int len;" ++ ctype a "*arr" ++ ";};\n")
+        dt@(PInterface t as@(p:ps)) -> do
+            let n = pdt2str dt
+            conditionallyCreate n $ do
+                methods <- getModelMethods dt
+                compileStruct dt n methods
+        dt@(PSum dts) -> do
+            let n = pdt2str dt
+            conditionallyCreate n $ do
+                methods <- concat <$> mapM getModelMethods dts
+                compileStruct dt n methods
+        _   -> return ()
 
 -- Pääfunktio
 
@@ -186,7 +187,7 @@ compile decls = do let pvars = map decl2pvar
                       },
                       counter = 0,
                       extends = supers,
-                      typeMethods = models,
+                      models = models,
                       definedStructs = []
                    }
                    runStateT (rec (mapM (compileDecl pvars)) decls) scope
@@ -217,12 +218,17 @@ compileDecl pvars (Func func) =
           generateEnd
           return []
 compileDecl _ (Mdl m) = do
-    let mname = modelName m
-    compileStruct (PInterface mname []) mname (methods m) --TODO
+    when (null $ typeparameters m) $ do
+        let mname = modelName m
+        let dt = PInterface mname [] --TODO
+        fs <- mapM (subsFunction Map.empty) $ methods m
+        compileStruct dt mname fs
     return []
-compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
+compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) = do
+    let dt = dt2pdt m
+    ss <- getSubstitutions dt
     concat <$> forM fs (\f -> do
-        mf' <- getModelMethod (dt2pdt m) (name f)
+        mf' <- getModelMethod dt (name f)
         if isNothing mf'
             then do tellError ("Invalid extension of " ++ n ++ " with "
                             ++ name f ++ "(): no such method")
@@ -234,22 +240,22 @@ compileDecl _ (Ext Extend { dtName = n, model = m, eMethods = fs}) =
                     let t = case comb of
                             [c]  -> c
                             list -> PSum list
-                    compileStructMethod t mf n f
+                    sfs <- subsFunction ss f
+                    compileStructMethod t mf n sfs
                  )
                 return [Func f {
                     name = '_' : n ++ "_" ++ name f,
                     parameters = ("this", Typename n []) : parameters f
-                }]
-    )
+                }])
 
-compileStruct :: PDatatype -> String -> [Function] -> Compiler ()
+compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
 compileStruct dt mname methods = do
     lift $ generateHeaderCode ("struct " ++ mname ++ "{\n")
     forM_ methods $ \f ->
-        let r = dt2pdt (returnType f) `ifDollar` dt
-            ps = dt : map (dt2pdt.snd) (parameters f)
+        let r = sreturnType f `ifDollar` dt
+            ps = dt : map snd (sparameters f)
         in lift $ generateHeaderCode ("    " ++
-            ctype r ('(':'*':name f ++ ")(" ++ cparams ps ++ ")") ++ ";\n")
+            ctype r ('(':'*':sname f ++ ")(" ++ cparams ps ++ ")") ++ ";\n")
     case dt of
         PSum dts -> forM_ (combinations dts) $ \c ->
             lift $ generateHeaderCode ("    " ++ ctype (sumOrModel c) (concatMap pdt2str c)
@@ -257,19 +263,19 @@ compileStruct dt mname methods = do
         _ -> return ()
     lift $ generateHeaderCode "    void *_obj;\n};\n"
 
-compileStructMethod :: PDatatype -> Function -> String -> Function -> Compiler ()
+compileStructMethod :: PDatatype -> FSignature -> String -> FSignature -> Compiler ()
 compileStructMethod m mf n f = do
-    let mr = dt2pdt $ returnType mf
-        r = dt2pdt $ returnType f
+    let mr = sreturnType mf
+        r = sreturnType f
         ps = ctype m "this"
-            : map (\(n,d) -> ctype (dt2pdt d) n) (parameters f)
+            : map (\(n,d) -> ctype d n) (sparameters f)
         ps' = ("*(("++ctype (PInterface n []) "*" ++")this->_obj)") -- TODO
-            : map fst (parameters f)
+            : map fst (sparameters f)
         signature = ctype (mr `ifDollar` m)
-            (n ++ "_" ++ pdt2str m ++ "_" ++ name f ++ "(" ++ joinColon ps ++ ")")
+            (n ++ "_" ++ pdt2str m ++ "_" ++ sname f ++ "(" ++ joinColon ps ++ ")")
     lift $ generateHeaderCode (signature ++ ";\n")
     lift $ generateCode (signature ++ " {\n")
-    generateCreate r "_ret" ("_" ++ n ++ "_" ++ name f ++ "(" ++ joinColon ps' ++ ")")
+    generateCreate r "_ret" ("_" ++ n ++ "_" ++ sname f ++ "(" ++ joinColon ps' ++ ")")
     checktype "_ret2" "_ret" (mr `ifDollar` m) r
     generateReturn "_ret2"
     lift $ generateCode "\n}\n"
@@ -464,8 +470,8 @@ compileMethodCall v obj dt method args
             Just m' -> compileMethodCall' v m' ('_':pdt2str dt++'_':method) obj dt args
 
 compileMethodCall' v f n obj dt args = do
-    let r = dt2pdt (returnType f) `ifDollar` dt
-    argcodes <- checkargs (map (\(n,d) -> dt2pdt d) (parameters f)) args
+    let r = sreturnType f `ifDollar` dt
+    argcodes <- checkargs (map snd (sparameters f)) args
     generateCreate r v
         (n++"("++joinColon (obj:argcodes)++")")
     return r
