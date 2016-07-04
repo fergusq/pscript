@@ -97,8 +97,9 @@ Params	: Parameter ',' Params		{ ($1 : $3) }
 
 Parameter : Datatype var		{ ($2, $1) }
 
-Struct	: struct var '{' Fields '}'	{ Struct $2 [] $4 }
-	| struct var '{' '}'		{ Struct $2 [] [] }
+Struct	: struct var '{' Fields '}'			{ Struct $2 [] $4 }
+	| struct var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 }
+	| struct var '{' '}'				{ Struct $2 [] [] }
 
 Fields	: Parameter ';' Fields		{ ($1 : $3) }
 	| Parameter ';'			{ [$1] }
@@ -184,6 +185,8 @@ Prim	: int				{ Int $1 }
 	| '(' Exp ')'			{ $2 }
 	| '[' Args ']'			{ List $2 }
 	| new Datatype '[' Exp ']'	{ NewList $2 $4 }
+	| new Datatype '{' Args '}'	{ NewStruct $2 $4 }
+	| new Datatype '{' '}'		{ NewStruct $2 [] }
 
 {
 parseError :: [Token] -> a
@@ -245,6 +248,7 @@ data Expression
 	| List [Expression]
 	| Call Expression [Expression]
 	| NewList Datatype Expression
+	| NewStruct Datatype [Expression]
 	deriving Show
 }
 

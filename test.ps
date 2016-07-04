@@ -137,7 +137,7 @@ extend Printer with PipeInput<String> {
 	}
 }
 
-Printer printer() { var i = 3; }
+Printer printer() { return new Printer {}; }
 
 Int[] fromTo(Int from, Int to) {
 	var array = new Int[to-from+1];

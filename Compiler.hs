@@ -453,6 +453,20 @@ compileExpression v (NewList dt size)
                                       ++ var'
                                       ++ "*sizeof(" ++ ctype pdt "" ++ "))}")
          return (pArray pdt)
+compileExpression v (NewStruct dt fieldValues) = do
+    ss <- getCurrentSubs
+    pdt <- substitute ss dt
+    fs <- getFields pdt
+    case fs of
+        Just fs' -> do
+            fieldcodes <- checkargs (map snd fs') fieldValues
+            generateCreate pdt v ("alloc(sizeof(struct "++pdt2str pdt ++ "))")
+            forM_ (zip fs' fieldcodes) $ \((n, _), c) ->
+                generateAssign (v++"->"++n) c
+            return pdt
+        Nothing -> do
+            tellError ("struct not found: " ++ show dt)
+            return PNothing
 compileExpression v (MethodCall obj method args)
     = do var <- tmpVar
          dt <- compileExpression var obj

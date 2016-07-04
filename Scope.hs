@@ -75,7 +75,14 @@ getSubstitutions dt@(PInterface n ts) = do
         Just model ->
             let tps = typeparameters model
             in return $ Map.fromList (zip tps ts)
-        Nothing -> return Map.empty
+        Nothing -> do
+            let s = structs scope
+            case Map.lookup n s of
+                Just struct ->
+                    let tps = stcTypeparameters struct
+                    in return $ Map.fromList (zip tps ts)
+                Nothing ->
+                    return Map.empty
 
 getCurrentSubs :: Compiler Subs
 getCurrentSubs = do
@@ -147,6 +154,19 @@ getDTypeMethod dt m
     = do ms <- getDTypeMethods dt
          return $ searchMethod ms m
 
+getFields :: PDatatype -> Compiler (Maybe [(String, PDatatype)])
+getFields dt@(PInterface n _) = do
+    ss <- getSubstitutions dt
+    scope <- get
+    let s = Map.lookup n (structs scope)
+    case s of
+        Just s' -> do
+            a <- forM (stcFields s') $ \(n, t) -> do
+                t' <- substitute ss t
+                return (n, t')
+            return $ Just a
+        Nothing -> return Nothing
+
 nextNum :: Compiler Int
 nextNum = do scope <- get
              let num = counter scope
@@ -155,7 +175,7 @@ nextNum = do scope <- get
 
 tmpVar :: Compiler String
 tmpVar = do id <- nextNum
-            return ("tmp" ++ show id)
+            return ("_tmp" ++ show id)
 
 conditionallyCreateStruct :: String -> Compiler () -> Compiler ()
 conditionallyCreateStruct n callback = do
