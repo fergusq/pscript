@@ -11,20 +11,26 @@ import qualified Data.Map as Map
 type Generator = WriterT [String] (WriterT [String] (WriterT [String] (Writer [String])))
 type Compiler a = StateT Scope Generator a
 
+type Subs = Map.Map String PDatatype
+
 data Scope = Scope {
     varscope :: VarScope,
-    extends :: Map.Map String [PDatatype],
+    extends :: Map.Map String [Extend],
     models :: Map.Map String Model,
+    structs :: Map.Map String Struct,
     counter :: Int,
     definedStructs :: [String],
     definedMethods :: [String],
-    generatorQueue :: [Compiler ()]
+    definedExtends :: [String],
+    generatorQueue :: [Compiler ()],
+    declarationQueue :: [(Subs, Declaration)]
 }
 
 data VarScope = VarScope {
     functionName :: String,
     variables :: Map.Map String PDatatype,
-    expectedReturnType :: PDatatype
+    expectedReturnType :: PDatatype,
+    subs :: Subs
 }
 
 putVar :: String -> PDatatype -> Compiler ()
@@ -61,7 +67,7 @@ getCurrentFunctionName :: Compiler String
 getCurrentFunctionName = do scope <- get
                             return $ functionName $ varscope scope
 
-getSubstitutions :: PDatatype -> Compiler (Map.Map String PDatatype)
+getSubstitutions :: PDatatype -> Compiler Subs
 getSubstitutions dt@(PInterface n ts) = do
     scope <- get
     let m = models scope
@@ -70,6 +76,11 @@ getSubstitutions dt@(PInterface n ts) = do
             let tps = typeparameters model
             in return $ Map.fromList (zip tps ts)
         Nothing -> return Map.empty
+
+getCurrentSubs :: Compiler Subs
+getCurrentSubs = do
+    Scope { varscope = VarScope { subs = ss } } <- get
+    return ss
 
 getModelMethods :: PDatatype -> Compiler [FSignature]
 getModelMethods dt@(PInterface a _)
@@ -82,17 +93,42 @@ getModelMethods dt@(PInterface a _)
 getModelMethods dt@(PSum dts)
     = concat <$> mapM getModelMethods dts
 
-getExtends :: PDatatype -> Compiler [PDatatype]
-getExtends (PInterface a ts)
+getModelMethods PNothing = return [] -- virhe on annettu jo aiemmin
+
+getModelMethods dt = do
+    tellError $ show dt ++ " does not have methods"
+    return []
+
+getExtends :: PDatatype -> Compiler [Extend]
+getExtends dt@(PInterface a ts)
     = do scope <- get
-         let ms = fromMaybe [] (Map.lookup a $ extends scope)
-         return ms
+         let es = fromMaybe [] (Map.lookup a $ extends scope)
+         return es
+
+getExtends dt@(PSum dts)
+    = concat <$> mapM getExtends dts
+
+getExtends PNothing = return [] -- virhe on annettu jo aiemmin
+
+getExtends dt = do
+    tellError $ show dt ++ " does not have extensions"
+    return []
 
 getDTypeMethods :: PDatatype -> Compiler [FSignature]
-getDTypeMethods dt
-    = do ms <- getExtends dt
+getDTypeMethods dt@(PInterface _ ts)
+    = do es <- getExtends dt
+         ms <- mapM (\e -> do
+             let ss = Map.fromList $ zip (eTypeparameters e) ts
+             substitute ss $ model e
+          ) es
          mms <- mapM getModelMethods ms
          return $ concat mms
+
+getDTypeMethods PNothing = return [] -- virhe on annettu jo aiemmin
+
+getDTypeMethods dt = do
+    tellError $ show dt ++ " does not have methods"
+    return []
 
 searchMethod :: [FSignature] -> String -> Maybe FSignature
 searchMethod ms m
@@ -135,6 +171,13 @@ conditionallyCreateMethod n callback = do
         put scope { definedMethods = n : definedMethods scope }
         callback
 
+conditionallyCreateExtend :: String -> Compiler () -> Compiler ()
+conditionallyCreateExtend n callback = do
+    scope <- get
+    unless (n `elem` definedExtends scope) $ do
+        put scope { definedExtends = n : definedExtends scope }
+        callback
+
 tellError :: String -> Compiler ()
 tellError msg = do fname <- getCurrentFunctionName
                    lift . lift . lift . lift $ tell ["Error in " ++ fname ++ ": " ++ msg]
@@ -144,6 +187,11 @@ generateLater code = do
     scope <- get
     put scope { generatorQueue = code : generatorQueue scope }
 
+queueDecl :: Subs -> Declaration -> Compiler ()
+queueDecl ss d = do
+    scope <- get
+    put scope { declarationQueue = (ss, d) : declarationQueue scope }
+
 data FSignature = FSignature {
     sname :: String,
     sparameters :: [(String, PDatatype)],
@@ -152,7 +200,7 @@ data FSignature = FSignature {
 
 -- Korvaa tyyppiparametrit tyyppiargumentoilla
 
-substitute :: Map.Map String PDatatype -> Datatype -> Compiler PDatatype
+substitute :: Subs -> Datatype -> Compiler PDatatype
 substitute subs (Typeparam t) = case Map.lookup t subs of
                                     Just dt -> return dt
                                     _       -> do tellError ("Unknown typeparameter "++t
@@ -166,7 +214,7 @@ substitute subs (SumType ts) = do
     return $ PSum ts'
 substitute subs t = return $ dt2pdt t
 
-subsFunction :: Map.Map String PDatatype -> Function -> Compiler FSignature
+subsFunction :: Subs -> Function -> Compiler FSignature
 subsFunction subs f = do
     ps <- mapM (\(n, t) -> s t >>= \t' -> return (n, t')) $ parameters f
     rt <- s $ returnType f

@@ -1,6 +1,7 @@
 extern Void printf(Str s, Int i);
 extern Void sprintf(Str to, Str format, Int i);
 extern Void puts(Str s);
+extern Int strlen(Str s);
 
 Void printInt(Int i) { printf("%d\n", i); }
 
@@ -11,6 +12,28 @@ model String {
 extend Str with String {
 	Str toString() {
 		return this;
+	}
+}
+
+model HasSize {
+	Int size();
+}
+
+extend String with HasSize {
+	Int size() {
+		return this.toString().size();
+	}
+}
+
+extend Str with HasSize {
+	Int size() {
+		return strlen(this);
+	}
+}
+
+extend Array<@T> with HasSize {
+	Int size() {
+		return this.length();
 	}
 }
 
@@ -34,6 +57,12 @@ extend Int with Printable {
 extend Str with Printable {
 	Void print() {
 		puts(this);
+	}
+}
+
+extend String with Printable {
+	Void print() {
+		this.toString().print();
 	}
 }
 
@@ -67,14 +96,57 @@ extend Int with Appendable<Int> {
 	}
 }
 
+extend Array<@T> with Appendable<@T> {
+	@T[] append(@T item) {
+		var newArray = new @T[this.length()+1];
+		for (i in fromTo(0, this.length()-1)) {
+			newArray[i] = this[i];
+		}
+		newArray[this.length()] = item;
+		return newArray;
+	}
+}
+
+model PipeOutput<@T> {
+	Void operator |(PipeInput<@T> pipe);
+}
+
+model PipeInput<@T> {
+	Void consume(@T t);
+}
+
+extend Array<@T> with PipeOutput<@T> {
+	Void operator |(PipeInput<@T> pipe) {
+		for (element in this) {
+			pipe.consume(element);
+		}
+	}
+}
+
+extend Int with PipeInput<Int> {
+	Void consume(Int i) {
+		(this*i).print();
+	}
+}
+
+struct Printer { }
+
+extend Printer with PipeInput<String> {
+	Void consume(String s) {
+		s.print();
+	}
+}
+
+Printer printer() { var i = 3; }
+
 Int[] fromTo(Int from, Int to) {
-	var list = new Int[to-from+1];
+	var array = new Int[to-from+1];
 	var i = 0;
-	for (value in list) {
-		list[i] = from+i;
+	for (value in array) {
+		array[i] = from+i;
 		i = i + 1;
 	}
-	return list;
+	return array;
 }
 
 Void shout(Printable&Squarable p) {
@@ -92,4 +164,8 @@ Void main() {
 	for (i in arr) i.square().print();
 	shoutAll(arr);
 	shoutAll(10.duplicate());
+	"---".print();
+	"---".size().print();
+	[1,2,3].size().print();
+	[1,2,3].append(1) | 4;
 }

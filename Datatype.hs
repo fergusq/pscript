@@ -10,11 +10,12 @@ type PVariable = (String, PDatatype)
 data PDatatype = PInterface String [PDatatype]
                | PSum [PDatatype]
                | PDollar
-               | PNothing deriving (Eq, Ord, Show)
+               | PNothing deriving (Eq, Ord)
 
 -- PNothing on pseudotyyppi, jonka kääntäjä antaa virheellisille lausekkeille
 
-pList a = PInterface "List" [a]
+pArray a = PInterface "Array" [a]
+pPointer a = PInterface "Pointer" [a]
 pFunction r ps = PInterface "Func" (r:ps)
 pInteger = PInterface "Int" []
 pBool = PInterface "Bool" []
@@ -34,7 +35,7 @@ decl2pvar f = (name f, pFunction (dt2pdt $ returnType f) (map (dt2pdt . snd) $ p
 -- Muuttaa tietotyypin PDatatype-olioksi
 
 dt2pdt :: Datatype -> PDatatype
-dt2pdt (Typename "List" [dt]) = pList $ dt2pdt dt
+dt2pdt (Typename "Array" [dt]) = pArray $ dt2pdt dt
 dt2pdt (Typename "Func" (dt:dts)) = pFunction (dt2pdt dt) (map dt2pdt dts)
 dt2pdt (Typename "Int" []) = pInteger
 dt2pdt (Typename "Str" []) = pString
@@ -45,7 +46,8 @@ dt2pdt (SumType dts) = PSum (map dt2pdt dts)
 dt2pdt DollarType = PDollar
 
 ctype :: PDatatype -> String -> String
-ctype (PInterface "List" [a]) n = "struct List1" ++ pdt2str a ++ " " ++ n
+ctype (PInterface "Array" [a]) n = "struct Array1" ++ pdt2str a ++ " " ++ n
+ctype (PInterface "Pointer" [a]) n = ctype a ('*':n)
 ctype (PInterface "Func" (r:ps)) n = ctype r ("(*" ++ n ++ ")(" ++ cparams ps ++ ")")
 ctype (PInterface "Int" []) n = "int " ++ n
 ctype (PInterface "Bool" []) n = "int " ++ n
@@ -64,3 +66,11 @@ pdt2str :: PDatatype -> String
 pdt2str (PInterface a []) = a
 pdt2str (PInterface a as) = a ++ show (length as) ++ concatMap pdt2str as
 pdt2str (PSum dts) = joinChar '_' (sort $ map pdt2str dts)
+pdt2str PNothing = "<nothing>"
+
+instance Show PDatatype where
+    show (PInterface a []) = a
+    show (PInterface a as) = a ++ "<" ++ joinColon (map pdt2str as) ++ ">"
+    show (PSum dts) = joinChar '&' (sort $ map pdt2str dts)
+    show PDollar = "$"
+    show PNothing = "<nothing>"

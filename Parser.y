@@ -8,46 +8,49 @@ import Lexer
 %error { parseError }
 
 %token
-	for		{ TokenFor }
-	in		{ TokenIn }
-	let		{ TokenVar }
-	if		{ TokenIf }
-	else		{ TokenElse }
-	return		{ TokenReturn }
-	extern		{ TokenExtern }
-	model		{ TokenModel }
-	extend		{ TokenExtend }
-	with		{ TokenWith }
-	new		{ TokenNew }
-	int		{ TokenInt $$ }
-	str		{ TokenString $$ }
-	var		{ TokenVarname $$ }
-	'='		{ TokenEq }
-	'+'		{ TokenPlus }
-	'-'		{ TokenMinus }
-	'*'		{ TokenTimes }
-	'/'		{ TokenDiv }
-	'('		{ TokenOP }
-	')'		{ TokenCP }
-	'['		{ TokenOB }
-	']'		{ TokenCB }
-	'{'		{ TokenOW }
-	'}'		{ TokenCW }
-	'<'		{ TokenLt }
-	'>'		{ TokenGt }
-	','		{ TokenC }
-	';'		{ TokenSC }
-	'.'		{ TokenDot }
-	'$'		{ TokenDollar }
-	'&'		{ TokenAmp }
-	'@'		{ TokenAt }
-	arrow		{ TokenArrow }
-	eq		{ TokenEqEq }
-	neq		{ TokenNeq }
-	le		{ TokenLe }
-	ge		{ TokenGe }
-	and		{ TokenAnd }
-	or		{ TokenOr }
+	for		{ Token _ TokenFor }
+	in		{ Token _ TokenIn }
+	let		{ Token _ TokenVar }
+	if		{ Token _ TokenIf }
+	else		{ Token _ TokenElse }
+	return		{ Token _ TokenReturn }
+	extern		{ Token _ TokenExtern }
+	model		{ Token _ TokenModel }
+	extend		{ Token _ TokenExtend }
+	with		{ Token _ TokenWith }
+	new		{ Token _ TokenNew }
+	operator	{ Token _ TokenOperator }
+	struct		{ Token _ TokenStruct }
+	int		{ Token _ (TokenInt $$) }
+	str		{ Token _ (TokenString $$) }
+	var		{ Token _ (TokenVarname $$) }
+	'='		{ Token _ TokenEq }
+	'+'		{ Token _ TokenPlus }
+	'-'		{ Token _ TokenMinus }
+	'*'		{ Token _ TokenTimes }
+	'/'		{ Token _ TokenDiv }
+	'('		{ Token _ TokenOP }
+	')'		{ Token _ TokenCP }
+	'['		{ Token _ TokenOB }
+	']'		{ Token _ TokenCB }
+	'{'		{ Token _ TokenOW }
+	'}'		{ Token _ TokenCW }
+	'<'		{ Token _ TokenLt }
+	'>'		{ Token _ TokenGt }
+	','		{ Token _ TokenC }
+	';'		{ Token _ TokenSC }
+	'.'		{ Token _ TokenDot }
+	'$'		{ Token _ TokenDollar }
+	'&'		{ Token _ TokenAmp }
+	'@'		{ Token _ TokenAt }
+	'|'		{ Token _ TokenPipe }
+	arrow		{ Token _ TokenArrow }
+	eq		{ Token _ TokenEqEq }
+	neq		{ Token _ TokenNeq }
+	le		{ Token _ TokenLe }
+	ge		{ Token _ TokenGe }
+	and		{ Token _ TokenAnd }
+	or		{ Token _ TokenOr }
 
 %%
 
@@ -58,15 +61,17 @@ Decl	: Func				{ Func $1 }
 	| extern ExternFunc		{ Func $2 }
 	| Model				{ Mdl $1 }
 	| Extend			{ Ext $1 }
+	| Struct			{ Stc $1 }
 
-Model	: model var '{' EFuncs '}'	{ Model { modelName = $2, typeparameters = [], methods = $4 } }
-	| model var '<' TParams '>' '{' EFuncs '}' { Model { modelName = $2, typeparameters = $4, methods = $7 } }
+Model	: model var '{' EFuncs '}'			{ Model { modelName = $2, typeparameters = [], methods = $4 } }
+	| model var '<' TParams '>' '{' EFuncs '}' 	{ Model { modelName = $2, typeparameters = $4, methods = $7 } }
 
 
 TParams	: '@' var ',' TParams		{ ($2 : $4) }
 	| '@' var			{ [$2] }
 
-Extend	: extend var with Datatype '{' Funcs '}' { Extend { dtName = $2, model = $4, eMethods = $6 } }
+Extend	: extend var with Datatype '{' Funcs '}'			{ Extend { dtName = $2, eTypeparameters = [], model = $4, eMethods = $6 } }
+	| extend var '<' TParams '>' with Datatype '{' Funcs '}'	{ Extend { dtName = $2, eTypeparameters = $4, model = $7, eMethods = $9 } }
 
 Funcs	: Func Funcs			{ ($1 : $2) }
 	| Func				{ [$1] }
@@ -76,21 +81,34 @@ EFuncs	: ExternFunc Funcs		{ ($1 : $2) }
 
 Func	: Datatype var '(' Params ')' Stmt	{ Function { name = $2, parameters = $4, returnType = $1, body = $6 } }
 	| Datatype var '(' ')' Stmt		{ Function { name = $2, parameters = [], returnType = $1, body = $5 } }
+	| Datatype operator Op '(' Parameter ')' Stmt	{ Function { name = $3, parameters = [$5], returnType = $1, body = $7 } }
 
 ExternFunc
 	: Datatype var '(' Params ')' ';'	{ Function { name = $2, parameters = $4, returnType = $1, body = Extern } }
 	| Datatype var '(' ')' ';'		{ Function { name = $2, parameters = [], returnType = $1, body = Extern } }
+	| Datatype operator Op '(' Parameter ')' ';'	{ Function { name = $3, parameters = [$5], returnType = $1, body = Extern } }
+
+Op	: '|'				{ "op_pipe" }
+	| '[' ']'			{ "op_get" }
+	| '[' ']' '='			{ "op_set" }
 
 Params	: Parameter ',' Params		{ ($1 : $3) }
 	| Parameter			{ [$1] }
 
 Parameter : Datatype var		{ ($2, $1) }
 
+Struct	: struct var '{' Fields '}'	{ Struct $2 [] $4 }
+	| struct var '{' '}'		{ Struct $2 [] [] }
+
+Fields	: Parameter ';' Fields		{ ($1 : $3) }
+	| Parameter ';'			{ [$1] }
+
 Datatype: PrimDT			{ $1 }
 	| '$'				{ DollarType }
 	| '@' var			{ Typeparam $2 }
 	| PrimDT '&' SumDT		{ SumType ($1:$3) }
-	| Datatype '[' ']'		{ Typename "List" [$1] }
+	| Datatype '[' ']'		{ Typename "Array" [$1] }
+	| Datatype '*'			{ Typename "Pointer" [$1] }
 	| Datatype arrow Datatype	{ Typename "Func" [$3, $1] }
 	| '(' DtList ')' arrow Datatype	{ Typename "Func" ($5:$2) }
 	| '(' ')' arrow Datatype	{ Typename "Func" [$4] }
@@ -112,14 +130,15 @@ Stmt	: Call ';'			{ Expr $1 }
 	| var '=' Exp ';'		{ Assign $1 $3 }
 	| return Exp ';'		{ Return $2 }
 	| '{' Stmts '}'			{ Block $2 }
+	| Preprim '|' Pipe ';'		{ Expr $ MethodCall $1 "op_pipe" [$3] }
 
 Stmts	: Stmt Stmts			{ ($1 : $2) }
 	| Stmt				{ [$1] }
 
 Call	: Preprim '(' Args ')'		{ Call $1 $3 }
 	| Preprim '(' ')'		{ Call $1 [] }
-	| Preprim '[' Exp ']'		{ MethodCall $1 "[]" [$3] }
-	| Preprim '[' Exp ']' '=' Exp	{ MethodCall $1 "[]=" [$3, $6] }
+	| Preprim '[' Exp ']'		{ MethodCall $1 "op_get" [$3] }
+	| Preprim '[' Exp ']' '=' Exp	{ MethodCall $1 "op_set" [$3, $6] }
 	| Preprim '.' var '(' Args ')'	{ MethodCall $1 $3 $5 }
 	| Preprim '.' var '(' ')'	{ MethodCall $1 $3 [] }
 	
@@ -129,28 +148,31 @@ Args	: Exp ',' Args			{ ($1 : $3) }
 
 Exp	: Logic1			{ $1 }
 
-Logic1	: Logic1 or Logic2		{ MethodCall $1 "||" [$3] }
+Logic1	: Logic1 or Logic2		{ MethodCall $1 "op_or" [$3] }
 	| Logic2			{ $1 }
 
-Logic2	: Logic2 and Cmp1		{ MethodCall $1 "&&" [$3] }
+Logic2	: Logic2 and Cmp1		{ MethodCall $1 "op_and" [$3] }
 	| Cmp1				{ $1 }
 
-Cmp1	: Cmp1 eq Cmp2			{ MethodCall $1 "==" [$3] }
-	| Cmp1 neq Cmp2			{ MethodCall $1 "!=" [$3] }
+Cmp1	: Cmp1 eq Cmp2			{ MethodCall $1 "op_eq" [$3] }
+	| Cmp1 neq Cmp2			{ MethodCall $1 "op_neq" [$3] }
 	| Cmp2				{ $1 }
 
-Cmp2	: Cmp2 '<' Sum			{ MethodCall $1 "<" [$3] }
-	| Cmp2 '>' Sum			{ MethodCall $1 ">" [$3] }
-	| Cmp2 le Sum			{ MethodCall $1 "<=" [$3] }
-	| Cmp2 ge Sum			{ MethodCall $1 ">=" [$3] }
+Cmp2	: Cmp2 '<' Sum			{ MethodCall $1 "op_lt" [$3] }
+	| Cmp2 '>' Sum			{ MethodCall $1 "op_gt" [$3] }
+	| Cmp2 le Sum			{ MethodCall $1 "op_le" [$3] }
+	| Cmp2 ge Sum			{ MethodCall $1 "op_ge" [$3] }
 	| Sum				{ $1 }
 
-Sum	: Sum '+' Term			{ MethodCall $1 "+" [$3] }
-	| Sum '-' Term			{ MethodCall $1 "-" [$3] }
+Sum	: Sum '+' Term			{ MethodCall $1 "op_add" [$3] }
+	| Sum '-' Term			{ MethodCall $1 "op_sub" [$3] }
 	| Term				{ $1 }
 
-Term	: Term '*' Preprim		{ MethodCall $1 "*" [$3] }
-	| Term '/' Preprim		{ MethodCall $1 "/" [$3] }
+Term	: Term '*' Pipe			{ MethodCall $1 "op_mul" [$3] }
+	| Term '/' Pipe			{ MethodCall $1 "op_div" [$3] }
+	| Pipe				{ $1 }
+
+Pipe	: Pipe '|' Preprim		{ MethodCall $1 "op_pipe" [$3] }
 	| Preprim			{ $1 }
 
 Preprim	: Call				{ $1 }
@@ -165,10 +187,12 @@ Prim	: int				{ Int $1 }
 
 {
 parseError :: [Token] -> a
-parseError t = error ("Parse error on " ++ case t of (t:ts) -> show t
-                                                     _      -> "EOF") 
+parseError ((Token ln t):ts)
+	= error ("[Line " ++ show ln ++ "] Parse error on " ++ show t)
+parseError [] = error "Parser error on EOF"
+
 data Declaration =
-	Func Function | Mdl Model | Ext Extend deriving Show
+	Func Function | Mdl Model | Ext Extend | Stc Struct deriving Show
 
 data Model = Model {
 	modelName :: String,
@@ -178,9 +202,16 @@ data Model = Model {
 
 data Extend = Extend {
 	dtName :: String,
+	eTypeparameters :: [String],
 	model :: Datatype,
 	eMethods :: [Function]
-}  deriving Show
+} deriving Show
+
+data Struct = Struct {
+	stcName :: String,
+	stcTypeparameters :: [String],
+	stcFields :: [(String, Datatype)]
+} deriving Show
 
 data Function = Function {
 	name :: String,

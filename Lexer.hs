@@ -1,7 +1,8 @@
 module Lexer where
 import Data.Char
 
-data Token
+data Token = Token Int TokenClass
+data TokenClass
 	= TokenVar
 	| TokenFor
 	| TokenIn
@@ -13,6 +14,8 @@ data Token
 	| TokenExtend
 	| TokenWith
 	| TokenNew
+	| TokenOperator
+	| TokenStruct
 	| TokenInt Int
 	| TokenString String
 	| TokenVarname String
@@ -45,63 +48,67 @@ data Token
 	| TokenAt
 	deriving Show
 
-lexer :: String -> [Token]
-lexer [] = []
-lexer ('=':'=':cs) = TokenEqEq : lexer cs
-lexer ('!':'=':cs) = TokenNeq : lexer cs
-lexer ('=':cs) = TokenEq : lexer cs
-lexer ('+':cs) = TokenPlus : lexer cs
-lexer ('-':'>':cs) = TokenArrow : lexer cs
-lexer ('-':cs) = TokenMinus : lexer cs
-lexer ('*':cs) = TokenTimes : lexer cs
-lexer ('/':cs) = TokenDiv : lexer cs
-lexer ('(':cs) = TokenOP : lexer cs
-lexer (')':cs) = TokenCP : lexer cs
-lexer ('[':cs) = TokenOB : lexer cs
-lexer (']':cs) = TokenCB : lexer cs
-lexer ('{':cs) = TokenOW : lexer cs
-lexer ('}':cs) = TokenCW : lexer cs
-lexer ('<':'=':cs) = TokenLe : lexer cs
-lexer ('>':'=':cs) = TokenGe : lexer cs
-lexer ('<':cs) = TokenLt : lexer cs
-lexer ('>':cs) = TokenGt : lexer cs
-lexer (',':cs) = TokenC : lexer cs
-lexer (';':cs) = TokenSC : lexer cs
-lexer ('&':'&':cs) = TokenAnd : lexer cs
-lexer ('|':'|':cs) = TokenOr : lexer cs
-lexer ('&':cs) = TokenAmp : lexer cs
-lexer ('|':cs) = TokenPipe : lexer cs
-lexer ('.':cs) = TokenDot : lexer cs
-lexer ('$':cs) = TokenDollar : lexer cs
-lexer ('@':cs) = TokenAt : lexer cs
-lexer ('"':cs) = lexString "" cs
-lexer (c:cs)
-	| isSpace c = lexer cs
-	| isAlpha c = lexVar (c:cs)
-	| isDigit c = lexNum (c:cs)
+lexer :: Int -> String -> [Token]
+lexer ln [] = []
+lexer ln ('=':'=':cs) = Token ln TokenEqEq : lexer ln cs
+lexer ln ('!':'=':cs) = Token ln TokenNeq : lexer ln cs
+lexer ln ('=':cs) = Token ln TokenEq : lexer ln cs
+lexer ln ('+':cs) = Token ln TokenPlus : lexer ln cs
+lexer ln ('-':'>':cs) = Token ln TokenArrow : lexer ln cs
+lexer ln ('-':cs) = Token ln TokenMinus : lexer ln cs
+lexer ln ('*':cs) = Token ln TokenTimes : lexer ln cs
+lexer ln ('/':cs) = Token ln TokenDiv : lexer ln cs
+lexer ln ('(':cs) = Token ln TokenOP : lexer ln cs
+lexer ln (')':cs) = Token ln TokenCP : lexer ln cs
+lexer ln ('[':cs) = Token ln TokenOB : lexer ln cs
+lexer ln (']':cs) = Token ln TokenCB : lexer ln cs
+lexer ln ('{':cs) = Token ln TokenOW : lexer ln cs
+lexer ln ('}':cs) = Token ln TokenCW : lexer ln cs
+lexer ln ('<':'=':cs) = Token ln TokenLe : lexer ln cs
+lexer ln ('>':'=':cs) = Token ln TokenGe : lexer ln cs
+lexer ln ('<':cs) = Token ln TokenLt : lexer ln cs
+lexer ln ('>':cs) = Token ln TokenGt : lexer ln cs
+lexer ln (',':cs) = Token ln TokenC : lexer ln cs
+lexer ln (';':cs) = Token ln TokenSC : lexer ln cs
+lexer ln ('&':'&':cs) = Token ln TokenAnd : lexer ln cs
+lexer ln ('|':'|':cs) = Token ln TokenOr : lexer ln cs
+lexer ln ('&':cs) = Token ln TokenAmp : lexer ln cs
+lexer ln ('|':cs) = Token ln TokenPipe : lexer ln cs
+lexer ln ('.':cs) = Token ln TokenDot : lexer ln cs
+lexer ln ('$':cs) = Token ln TokenDollar : lexer ln cs
+lexer ln ('@':cs) = Token ln TokenAt : lexer ln cs
+lexer ln ('"':cs) = lexString ln "" cs
+lexer ln ('\n':cs) = lexer (ln+1) cs
+lexer ln (c:cs)
+	| isSpace c = lexer ln cs
+	| isAlpha c = lexVar ln (c:cs)
+	| isDigit c = lexNum ln (c:cs)
 	| otherwise = error ("Illegal character: " ++ [c])
 
-lexString s ('"':cs) = TokenString s : lexer cs
-lexString s ('\\':'n':cs) = lexString (s ++ "\n") cs
-lexString s ('\\':'t':cs) = lexString (s ++ "\t") cs
-lexString s ('\\':'\\':cs) = lexString (s ++ "\\") cs
-lexString s (c:cs) = lexString (s ++ [c]) cs
-lexString s [] = error ("Unclosed string: " ++ s)
+lexString ln s ('"':cs) = Token ln (TokenString s) : lexer ln cs
+lexString ln s ('\\':'n':cs) = lexString ln (s ++ "\n") cs
+lexString ln s ('\\':'t':cs) = lexString ln (s ++ "\t") cs
+lexString ln s ('\\':'\\':cs) = lexString ln (s ++ "\\") cs
+lexString ln s ('\n':cs) = lexString (ln+1) (s ++ "\n") cs
+lexString ln s (c:cs) = lexString ln (s ++ [c]) cs
+lexString ln s [] = error ("Unclosed string: " ++ s)
 
-lexNum cs = TokenInt (read num) : lexer rest
+lexNum ln cs = Token ln (TokenInt (read num)) : lexer ln rest
 	where (num,rest) = span isDigit cs
 
-lexVar cs =
+lexVar ln cs =
 	case span isAlphaNum cs of
-		("for",rest)    -> TokenFor : lexer rest
-		("in",rest)     -> TokenIn : lexer rest
-		("var",rest)    -> TokenVar : lexer rest
-		("if",rest)     -> TokenIf : lexer rest
-		("else",rest)   -> TokenElse : lexer rest
-		("return",rest) -> TokenReturn : lexer rest
-		("extern",rest) -> TokenExtern : lexer rest
-		("model",rest)  -> TokenModel : lexer rest
-		("extend",rest) -> TokenExtend : lexer rest
-		("with",rest)   -> TokenWith : lexer rest
-		("new",rest)    -> TokenNew : lexer rest
-		(var,rest)      -> TokenVarname var : lexer rest
+		("for",rest)     -> Token ln TokenFor : lexer ln rest
+		("in",rest)      -> Token ln TokenIn : lexer ln rest
+		("var",rest)     -> Token ln TokenVar : lexer ln rest
+		("if",rest)      -> Token ln TokenIf : lexer ln rest
+		("else",rest)    -> Token ln TokenElse : lexer ln rest
+		("return",rest)  -> Token ln TokenReturn : lexer ln rest
+		("extern",rest)  -> Token ln TokenExtern : lexer ln rest
+		("model",rest)   -> Token ln TokenModel : lexer ln rest
+		("extend",rest)  -> Token ln TokenExtend : lexer ln rest
+		("with",rest)    -> Token ln TokenWith : lexer ln rest
+		("new",rest)     -> Token ln TokenNew : lexer ln rest
+		("operator",rest)-> Token ln TokenOperator : lexer ln rest
+		("struct",rest)  -> Token ln TokenStruct : lexer ln rest
+		(var,rest)       -> Token ln (TokenVarname var) : lexer ln rest
