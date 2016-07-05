@@ -51,6 +51,7 @@ import Lexer
 	ge		{ Token _ TokenGe }
 	and		{ Token _ TokenAnd }
 	or		{ Token _ TokenOr }
+	field		{ Token _ TokenField }
 
 %%
 
@@ -75,21 +76,23 @@ Extend	: extend var with Datatype '{' Funcs '}'			{ Extend { dtName = $2, eTypep
 Funcs	: Func Funcs			{ ($1 : $2) }
 	| Func				{ [$1] }
 
-EFuncs	: ExternFunc Funcs		{ ($1 : $2) }
+EFuncs	: ExternFunc EFuncs		{ ($1 : $2) }
 	| ExternFunc			{ [$1] }
 
 Func	: Datatype var '(' Params ')' Stmt	{ Function { name = $2, parameters = $4, returnType = $1, body = $6 } }
 	| Datatype var '(' ')' Stmt		{ Function { name = $2, parameters = [], returnType = $1, body = $5 } }
-	| Datatype operator Op '(' Parameter ')' Stmt	{ Function { name = $3, parameters = [$5], returnType = $1, body = $7 } }
+	| Datatype operator Op1 '(' Parameter ')' Stmt	{ Function { name = $3, parameters = [$5], returnType = $1, body = $7 } }
+	| Datatype operator Op2 '(' Parameter ',' Parameter ')' Stmt	{ Function $3 [$5, $7] $1 $9 }
 
 ExternFunc
 	: Datatype var '(' Params ')' ';'	{ Function { name = $2, parameters = $4, returnType = $1, body = Extern } }
 	| Datatype var '(' ')' ';'		{ Function { name = $2, parameters = [], returnType = $1, body = Extern } }
-	| Datatype operator Op '(' Parameter ')' ';'	{ Function { name = $3, parameters = [$5], returnType = $1, body = Extern } }
+	| Datatype operator Op1 '(' Parameter ')' ';'	{ Function { name = $3, parameters = [$5], returnType = $1, body = Extern } }
+	| Datatype operator Op2 '(' Parameter ',' Parameter ')' ';'	{ Function $3 [$5, $7] $1 Extern }
 
-Op	: '|'				{ "op_pipe" }
+Op1	: '|'				{ "op_pipe" }
 	| '[' ']'			{ "op_get" }
-	| '[' ']' '='			{ "op_set" }
+Op2	: '[' ']' '='			{ "op_set" }
 
 Params	: Parameter ',' Params		{ ($1 : $3) }
 	| Parameter			{ [$1] }
@@ -142,6 +145,8 @@ Call	: Preprim '(' Args ')'		{ Call $1 $3 }
 	| Preprim '[' Exp ']' '=' Exp	{ MethodCall $1 "op_set" [$3, $6] }
 	| Preprim '.' var '(' Args ')'	{ MethodCall $1 $3 $5 }
 	| Preprim '.' var '(' ')'	{ MethodCall $1 $3 [] }
+	| Preprim field var		{ FieldGet $1 $3 }
+	| Preprim field var '=' Exp	{ FieldSet $1 $3 $5 }
 	
 
 Args	: Exp ',' Args			{ ($1 : $3) }
@@ -249,6 +254,8 @@ data Expression
 	| Call Expression [Expression]
 	| NewList Datatype Expression
 	| NewStruct Datatype [Expression]
+	| FieldGet Expression String
+	| FieldSet Expression String Expression
 	deriving Show
 }
 

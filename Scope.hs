@@ -2,6 +2,7 @@ module Scope where
 
 import Datatype
 import Parser
+import Util
 import Control.Monad.Writer
 import Control.Monad.State
 import Control.Arrow
@@ -121,15 +122,16 @@ getExtends dt = do
     tellError $ show dt ++ " does not have extensions"
     return []
 
-getDTypeMethods :: PDatatype -> Compiler [FSignature]
+getDTypeMethods :: PDatatype -> Compiler [(Extend, FSignature)]
 getDTypeMethods dt@(PInterface _ ts)
     = do es <- getExtends dt
-         ms <- mapM (\e -> do
+         ms <- forM es $ \e -> do
              let ss = Map.fromList $ zip (eTypeparameters e) ts
-             substitute ss $ model e
-          ) es
-         mms <- mapM getModelMethods ms
-         return $ concat mms
+             t <- substitute ss $ model e
+             mms <- getModelMethods t
+             forM mms $ \m ->
+                return (e, m)
+         return $ concat ms
 
 getDTypeMethods PNothing = return [] -- virhe on annettu jo aiemmin
 
@@ -137,22 +139,15 @@ getDTypeMethods dt = do
     tellError $ show dt ++ " does not have methods"
     return []
 
-searchMethod :: [FSignature] -> String -> Maybe FSignature
-searchMethod ms m
-    = let fms = filter (\m' -> sname m' == m) ms
-      in case fms of
-            []    -> Nothing
-            (a:_) -> Just a
-
 getModelMethod :: PDatatype -> String -> Compiler (Maybe FSignature)
 getModelMethod dt m
     = do ms <- getModelMethods dt
-         return $ searchMethod ms m
+         return $ search sname ms m
 
-getDTypeMethod :: PDatatype -> String -> Compiler (Maybe FSignature)
+getDTypeMethod :: PDatatype -> String -> Compiler (Maybe (Extend, FSignature))
 getDTypeMethod dt m
     = do ms <- getDTypeMethods dt
-         return $ searchMethod ms m
+         return $ search (sname.snd) ms m
 
 getFields :: PDatatype -> Compiler (Maybe [(String, PDatatype)])
 getFields dt@(PInterface n _) = do

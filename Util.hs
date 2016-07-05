@@ -40,6 +40,13 @@ firstJust []           = Nothing
 firstJust (Just a:as)  = Just a
 firstJust (Nothing:as) = firstJust as
 
+search :: (Eq b) => (a -> b) -> [a] -> b -> Maybe a
+search c ms m
+    = let fms = filter (\m' -> c m' == m) ms
+      in case fms of
+            []    -> Nothing
+            (a:_) -> Just a
+
 combinations :: (Eq a, Ord a) => [a] -> [[a]]
 combinations xs = nub $ map sort $ do n <- [1..length xs]
                                       let sublist = take (n-1) xs ++ drop n xs

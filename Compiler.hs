@@ -281,11 +281,10 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
         dt <- substitute ss m
         forM_ fs (\f -> do
             mf' <- getModelMethod dt (name f)
-            if isNothing mf'
-                then tellError ("Invalid extension of " ++ n ++ " with "
-                                ++ name f ++ "(): no such method in " ++ show dt)
-                else do
-                    let (Just mf) = mf'
+            case mf' of
+                Nothing -> tellError ("Invalid extension of " ++ n ++ " with "
+                                      ++ name f ++ "(): no such method in " ++ show dt)
+                Just mf -> do
                     let (Just etas) = forM tps (`Map.lookup` ss)
                     let edt = PInterface n etas
                     queueDecl ss $ Func f {
@@ -467,6 +466,49 @@ compileExpression v (NewStruct dt fieldValues) = do
         Nothing -> do
             tellError ("struct not found: " ++ show dt)
             return PNothing
+compileExpression v (FieldGet obj field) = do
+    var <- tmpVar
+    dt <- compileExpression var obj
+    fs <- getFields dt
+    case fs of
+        Just fs' -> do
+            let t = lookup field fs'
+            case t of
+                Just t' -> do
+                    generateCreate t' v (var++"->"++field)
+                    return t'
+                Nothing -> do
+                    tellError ("struct type " ++ show dt ++
+                               " does not have field `" ++ field ++ "'")
+                    return PNothing
+        Nothing -> do
+            tellError ("non-struct type " ++ show dt ++
+                       " does not have field `" ++ field ++ "'")
+            return PNothing
+compileExpression v (FieldSet obj field val) = do
+    var <- tmpVar
+    dt <- compileExpression var obj
+    fs <- getFields dt
+    case fs of
+        Just fs' -> do
+            let t = lookup field fs'
+            case t of
+                Just t' -> do
+                    var2 <- tmpVar
+                    dt2 <- compileExpression var2 val
+                    var3 <- tmpVar
+                    checktype var3 var2 t' dt2
+                    generateAssign (var++"->"++field) var3
+                    generateCreate dt2 v var2
+                    return dt2
+                Nothing -> do
+                    tellError ("struct type " ++ show dt ++
+                               " does not have field `" ++ field ++ "'")
+                    return PNothing
+        Nothing -> do
+            tellError ("non-struct type " ++ show dt ++
+                       " does not have field `" ++ field ++ "'")
+            return PNothing
 compileExpression v (MethodCall obj method args)
     = do var <- tmpVar
          dt <- compileExpression var obj
@@ -551,15 +593,18 @@ compileMethodCall v obj dt@(PSum dts) method args
 compileMethodCall v obj dt method args
     = do m <- getDTypeMethod dt method
          case m of
-            Nothing -> do p <- getModelMethod dt method
-                          case p of
-                            Nothing -> do
-                                tellError ("type " ++ show dt
-                                    ++ " does not have method `" ++ method ++ "'")
-                                return PNothing
-                            Just p' ->
-                                compileMethodCall' v p' (obj++"->"++method) obj dt args
-            Just m' -> compileMethodCall' v m' ('_':pdt2str dt++'_':method) obj dt args
+            Nothing -> do
+                p <- getModelMethod dt method
+                case p of
+                  Nothing -> do
+                      tellError ("type " ++ show dt ++
+                                 " does not have method `" ++ method ++ "'")
+                      return PNothing
+                  Just p' ->
+                      compileMethodCall' v p' (obj++"->"++method) obj dt args
+            Just (e, m') -> do
+                ensureExtendIsDefined dt e
+                compileMethodCall' v m' ('_':pdt2str dt++'_':method) obj dt args
 
 compileMethodCall' v f n obj dt args = do
     let r = sreturnType f `ifDollar` dt
