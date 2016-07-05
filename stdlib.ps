@@ -1,0 +1,93 @@
+#ifndef _STDLIB_PS
+#define _STDLIB_PS
+
+// STRING
+
+model String {
+	Str toString();
+}
+
+extend Str with String {
+	Str toString() {
+		return this;
+	}
+}
+
+extend Int with String {
+	Str toString() {
+		var todo = "<TODO>";
+		return todo;
+	}
+}
+
+// HASSIZE
+
+extern Int strlen(Str s);
+
+model HasSize {
+	Int size();
+}
+
+extend String with HasSize {
+	Int size() {
+		return this.toString().size();
+	}
+}
+
+extend Str with HasSize {
+	Int size() {
+		return strlen(this);
+	}
+}
+
+extend Array<@T> with HasSize {
+	Int size() {
+		return this.length();
+	}
+}
+
+// LIST
+
+struct List<@T> {
+	@T[] elements;
+}
+
+extend List<@T> with HasSize {
+	Int size() {
+		return this::elements.size();
+	}
+}
+
+model MutableList<@T> {
+	@T operator [] (Int index);
+	Void operator []= (Int index, @T value);
+	Void add(@T value);
+	@T remove(Int index);
+}
+
+extend List<@T> with MutableList<@T> {
+	@T operator [](Int index) {
+		return this::elements[index];
+	}
+	Void operator []=(Int index, @T value) {
+		this::elements[index] = value;
+	}
+	Void add(@T value) {
+		this::elements = this::elements.append(value);
+	}
+	@T remove(Int index) {
+		var t = this[index];
+		var newList = new @T[this.size()-1];
+		var i = 0;
+		for (v in this::elements) {
+			if (i < index)
+				newList[i] = v;
+			else if (i > index)
+				newList[i-1] = v;
+		}
+		this::elements = newList;
+		return t;
+	}
+}
+
+#endif
