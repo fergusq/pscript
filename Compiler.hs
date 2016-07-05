@@ -111,8 +111,8 @@ checktype v f right cand = do
             generateCreate pInteger ctr "0"
             generateWhile (ctr++"<"++f++".len")
             var <- tmpVar
-            checktype var (f++".arr["++ctr++"]") t u
-            generateAssign (v++".arr["++ctr++"]") var
+            checktype var (f++".ptr["++ctr++"]") t u
+            generateAssign (v++".ptr["++ctr++"]") var
             generateAssign ctr (ctr ++ "+1")
             generateEnd
         _ -> do
@@ -122,7 +122,7 @@ checktype v f right cand = do
 createModelObject :: String -> String -> PDatatype -> [PDatatype]
                      -> PDatatype -> Compiler ()
 createModelObject v f dt models from = do
-    generateCreate dt v ("alloc(sizeof(struct "++pdt2str dt++"))")
+    generateCreate dt v ("alloc(sizeof(struct _"++pdt2str dt++"))")
     ms <- concat <$> mapM getModelMethods models
     forM_ ms $ \m -> do
         generateAssign (v++"->"++sname m) (pdt2str from++'_':pdt2str dt++'_':sname m)
@@ -155,10 +155,12 @@ ensureStructIsDefined :: PDatatype -> Compiler ()
 ensureStructIsDefined dt =
     case dt of
         PInterface "Array" [a] -> do
-            let n = "Array1" ++ pdt2str a
-            conditionallyCreateStruct n $
+            let n = "_Array1" ++ pdt2str a
+            conditionallyCreateStruct n $ do
                 lift $ generateSuperHeaderCode
-                    ("struct "++n++"{int len;" ++ ctype a "*arr" ++ ";};\n")
+                    ("typedef struct " ++n ++ " " ++ n ++ ";\n")
+                lift $ generateSuperHeaderCode
+                    ("struct "++n++"{int len;" ++ ctype a "*ptr" ++ ";};\n")
         dt@(PInterface t as@(p:ps)) -> do
             scope <- get
             let n = pdt2str dt
@@ -211,7 +213,13 @@ compile decls = do
                     Ext e -> [(dtName e, e)]
                     _     -> []) decls
     let supers = collapse extends
-    let structs = Map.fromList $
+
+    let listStruct = Struct "Array" ["T"] [
+            ("len", Typename "Int" []),
+            ("ptr", Typename "Pointer" [Typeparam "T"])
+            ] True
+
+    let structs = Map.fromList $ ("Array", listStruct) :
                 concatMap (\d -> case d of
                     Stc s -> [(stcName s, s)]
                     _     -> []) decls
@@ -292,19 +300,24 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                         parameters = ("this", Typename n (map Typeparam tps)) : parameters f
                     }
          )
-compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs }) =
+compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs,
+                                isConst = c }) =
     when (null tps || not (null ss)) $ do
         let (Just etas) = forM tps (`Map.lookup` ss)
         let dt = PInterface n etas
-        lift $ generateHeaderCode ("struct " ++ pdt2str dt ++ "{\n")
+        lift $ generateSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
+                                        (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
+        lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
         forM_ fs $ \(fname, ftype) -> do
             ftype' <- substitute ss ftype
-            lift $ generateHeaderCode ("    " ++ ctype ftype' fname ++ ";\n")
-        lift $ generateHeaderCode "};\n"
+            lift $ generateSuperHeaderCode ("    " ++ ctype ftype' fname ++ ";\n")
+        lift $ generateSuperHeaderCode "};\n"
 
 compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
 compileStruct dt mname methods = do
-    lift $ generateSuperHeaderCode ("struct " ++ mname ++ "{\n")
+    lift $ generateSuperHeaderCode ("typedef struct _" ++ mname ++ "* " ++
+                                    mname ++ ";\n")
+    lift $ generateSuperHeaderCode ("struct _" ++ mname ++ "{\n")
     forM_ methods $ \f ->
         let r = sreturnType f `ifDollar` dt
             ps = dt : map snd (sparameters f)
@@ -330,7 +343,8 @@ compileStructMethod m mf dt = do
     lift $ generateHeaderCode (signature ++ ";\n")
     generateLater $ do
         lift $ generateCode (signature ++ " {\n")
-        generateCreate r "_ret" ("_" ++ pdt2str dt ++ "_" ++ sname mf ++ "(" ++ joinColon ps' ++ ")")
+        generateCreate r "_ret" ("_" ++ pdt2str dt ++ "_" ++ sname mf ++
+                                 "(" ++ joinColon ps' ++ ")")
         checktype "_ret2" "_ret" mr r
         generateReturn "_ret2"
         lift $ generateCode "\n}\n"
@@ -376,7 +390,7 @@ compileStatement (For name expr body)
             PInterface "Array" [dt']
                 -> do scope <- saveScope
                       putVar name dt'
-                      generateCreate dt' name (var++".arr["++ctr++"]")
+                      generateCreate dt' name (var++".ptr["++ctr++"]")
                       compileStatement body
                       generateAssign ctr (ctr ++ "+1")
                       restoreScope scope
@@ -433,12 +447,12 @@ compileExpression v (List (expr:exprs))
                                       ++ show (length exprs + 1)
                                       ++ "*sizeof(" ++ ctype dt "" ++ "))}")
          generateAssign (v++".len") (show $ length exprs + 1)
-         generateAssign (v++".arr[0]") var
+         generateAssign (v++".ptr[0]") var
          mapM_ (\(i,val) -> do var' <- tmpVar
                                vt <- compileExpression var' val
                                var'' <- tmpVar
                                checktype var'' var' dt vt
-                               generateAssign (v ++ ".arr["++show i++"]") var''
+                               generateAssign (v ++ ".ptr["++show i++"]") var''
                ) (zip [1..length exprs] exprs)
          return (pArray dt)
 compileExpression v (NewList dt size)
@@ -458,10 +472,15 @@ compileExpression v (NewStruct dt fieldValues) = do
     fs <- getFields pdt
     case fs of
         Just fs' -> do
-            fieldcodes <- checkargs (map snd fs') fieldValues
-            generateCreate pdt v ("alloc(sizeof(struct "++pdt2str pdt ++ "))")
-            forM_ (zip fs' fieldcodes) $ \((n, _), c) ->
-                generateAssign (v++"->"++n) c
+            fieldvaluecodes <- checkargs (map snd fs') fieldValues
+            (Just cons) <- isConstant pdt
+            if not cons
+             then do
+                generateCreate pdt v ("alloc(sizeof(struct _"++pdt2str pdt ++ "))")
+                forM_ (zip fs' fieldvaluecodes) $ \((n, _), c) ->
+                    generateAssign (v++"->"++n) c
+             else
+                generateCreate pdt v ("{" ++ joinColon fieldvaluecodes ++ "}")
             return pdt
         Nothing -> do
             tellError ("struct not found: " ++ show dt)
@@ -469,50 +488,54 @@ compileExpression v (NewStruct dt fieldValues) = do
 compileExpression v (FieldGet obj field) = do
     var <- tmpVar
     dt <- compileExpression var obj
-    fs <- getFields dt
-    case fs of
-        Just fs' -> do
-            let t = lookup field fs'
-            case t of
-                Just t' -> do
-                    generateCreate t' v (var++"->"++field)
-                    return t'
-                Nothing -> do
-                    tellError ("struct type " ++ show dt ++
-                               " does not have field `" ++ field ++ "'")
-                    return PNothing
-        Nothing -> do
-            tellError ("non-struct type " ++ show dt ++
-                       " does not have field `" ++ field ++ "'")
-            return PNothing
+    ifFieldExists dt field $ \t -> do
+        fieldcode <- structField dt var field
+        generateCreate t v fieldcode
+        return t
 compileExpression v (FieldSet obj field val) = do
     var <- tmpVar
     dt <- compileExpression var obj
-    fs <- getFields dt
-    case fs of
-        Just fs' -> do
-            let t = lookup field fs'
-            case t of
-                Just t' -> do
-                    var2 <- tmpVar
-                    dt2 <- compileExpression var2 val
-                    var3 <- tmpVar
-                    checktype var3 var2 t' dt2
-                    generateAssign (var++"->"++field) var3
-                    generateCreate dt2 v var2
-                    return dt2
-                Nothing -> do
-                    tellError ("struct type " ++ show dt ++
-                               " does not have field `" ++ field ++ "'")
-                    return PNothing
-        Nothing -> do
-            tellError ("non-struct type " ++ show dt ++
-                       " does not have field `" ++ field ++ "'")
-            return PNothing
+    ifFieldExists dt field $ \t -> do
+        var2 <- tmpVar
+        dt2 <- compileExpression var2 val
+        var3 <- tmpVar
+        checktype var3 var2 t dt2
+        fieldcode <- structField dt var field
+        generateAssign fieldcode var3
+        generateCreate dt2 v var2
+        return dt2
 compileExpression v (MethodCall obj method args)
     = do var <- tmpVar
          dt <- compileExpression var obj
          compileMethodCall v var dt method args
+
+-- suorittaa annetun koodin, jos kenttä on olemassa
+ifFieldExists :: PDatatype -> String -> (PDatatype -> Compiler PDatatype)
+                 -> Compiler PDatatype
+ifFieldExists dt field callback = do
+    fs <- getFields dt
+    case fs of
+        Just fs' -> do
+            let t = lookup field fs'
+            case t of
+                Just t' ->
+                    callback t'
+                Nothing -> do
+                    tellError ("struct type " ++ show dt ++
+                               " does not have field `" ++ field ++ "'")
+                    return PNothing
+        Nothing -> do
+            tellError ("non-struct type " ++ show dt ++
+                       " does not have field `" ++ field ++ "'")
+            return PNothing
+
+-- palauttaa C-lausekkeen rakenteen kenttää varten
+structField :: PDatatype -> String -> String -> Compiler String
+structField dt var field = do
+    (Just constant) <- isConstant dt
+    let accessOp = if constant then "." else "->" -- Jos rakenne on vakio,
+    return (var++accessOp++field)                 -- tyyppi ei ole pointteri
+
 
 -- Sisäänrakennettujen tyyppien metodit
 
@@ -551,21 +574,13 @@ compileMethodCall v obj (PInterface "Int" []) method args
 compileMethodCall v obj (PInterface "Array" [dt]) method args
     | method == "op_get"
         = do (index:vars) <- checkargs [pInteger] args
-             generateCreate dt v (obj ++ ".arr["++index++"]")
+             generateCreate dt v (obj ++ ".ptr["++index++"]")
              return dt
     | method == "op_set"
         = do (index:value:vars) <- checkargs [pInteger, dt] args
-             generateAssign (obj ++ ".arr["++index++"]") value
+             generateAssign (obj ++ ".ptr["++index++"]") value
              generateCreate dt v value
              return dt
-    | method == "length"
-        = do checkargs [] args
-             generateCreate pInteger v (obj ++ ".len")
-             return pInteger
-    | method == "ptr"
-        = do checkargs [] args
-             generateCreate (pPointer dt) v (obj ++ ".arr")
-             return pInteger
 
 -- PPointer
 compileMethodCall v obj (PInterface "Pointer" [dt]) method args

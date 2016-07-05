@@ -162,6 +162,14 @@ getFields dt@(PInterface n _) = do
             return $ Just a
         Nothing -> return Nothing
 
+isConstant :: PDatatype -> Compiler (Maybe Bool)
+isConstant dt@(PInterface n _) = do
+    scope <- get
+    let s = Map.lookup n (structs scope)
+    return $ do
+        s' <- s
+        return $ isConst s'
+
 nextNum :: Compiler Int
 nextNum = do scope <- get
              let num = counter scope

@@ -46,7 +46,7 @@ dt2pdt (SumType dts) = PSum (map dt2pdt dts)
 dt2pdt DollarType = PDollar
 
 ctype :: PDatatype -> String -> String
-ctype (PInterface "Array" [a]) n = "struct Array1" ++ pdt2str a ++ " " ++ n
+ctype (PInterface "Array" [a]) n = "struct _Array1" ++ pdt2str a ++ " " ++ n
 ctype (PInterface "Pointer" [a]) n = ctype a ('*':n)
 ctype (PInterface "Func" (r:ps)) n = ctype r ("(*" ++ n ++ ")(" ++ cparams ps ++ ")")
 ctype (PInterface "Int" []) n = "int " ++ n
@@ -54,8 +54,8 @@ ctype (PInterface "Bool" []) n = "int " ++ n
 ctype (PInterface "Str" []) n = "char*" ++ n
 ctype (PInterface "Void" []) n = "char " ++ n
 ctype PNothing n = "NOTHING " ++ n
-ctype dt@(PInterface a ts) n = "struct " ++ pdt2str dt ++ ('*':n)
-ctype dt@(PSum dts) n = "struct " ++ pdt2str dt ++ ('*':n)
+ctype dt@(PInterface a ts) n = pdt2str dt ++ " " ++ n -- määritellään typedefinä
+ctype dt@(PSum dts) n = "struct _" ++ pdt2str dt ++ ('*':n)
 
 cparams :: [PDatatype] -> String
 cparams [] = ""

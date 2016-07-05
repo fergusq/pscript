@@ -42,7 +42,7 @@ extend Str with HasSize {
 
 extend Array<@T> with HasSize {
 	Int size() {
-		return this.length();
+		return this::len;
 	}
 }
 

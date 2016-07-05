@@ -21,6 +21,7 @@ import Lexer
 	new		{ Token _ TokenNew }
 	operator	{ Token _ TokenOperator }
 	struct		{ Token _ TokenStruct }
+	const		{ Token _ TokenConst }
 	int		{ Token _ (TokenInt $$) }
 	str		{ Token _ (TokenString $$) }
 	var		{ Token _ (TokenVarname $$) }
@@ -99,10 +100,14 @@ Params	: Parameter ',' Params		{ ($1 : $3) }
 
 Parameter : Datatype var		{ ($2, $1) }
 
-Struct	: struct var '{' Fields '}'			{ Struct $2 [] $4 }
-	| struct var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 }
-	| struct var '<' TParams '>' '{' '}'		{ Struct $2 $4 [] }
-	| struct var '{' '}'				{ Struct $2 [] [] }
+Struct	: struct var '{' Fields '}'			{ Struct $2 [] $4 False }
+	| struct var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 False }
+	| struct var '<' TParams '>' '{' '}'		{ Struct $2 $4 [] False }
+	| struct var '{' '}'				{ Struct $2 [] [] False }
+	| const struct var '{' Fields '}'			{ Struct $3 [] $5 True }
+	| const struct var '<' TParams '>' '{' Fields '}'	{ Struct $3 $5 $8 True }
+	| const struct var '<' TParams '>' '{' '}'		{ Struct $3 $5 [] True }
+	| const struct var '{' '}'				{ Struct $3 [] [] True }
 
 Fields	: Parameter ';' Fields		{ ($1 : $3) }
 	| Parameter ';'			{ [$1] }
@@ -218,7 +223,8 @@ data Extend = Extend {
 data Struct = Struct {
 	stcName :: String,
 	stcTypeparameters :: [String],
-	stcFields :: [(String, Datatype)]
+	stcFields :: [(String, Datatype)],
+	isConst :: Bool
 } deriving Show
 
 data Function = Function {

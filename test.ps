@@ -68,11 +68,11 @@ extend Int with Appendable<Int> {
 
 extend Array<@T> with Appendable<@T> {
 	@T[] append(@T item) {
-		var newArray = new @T[this.length()+1];
-		for (i in fromTo(0, this.length()-1)) {
+		var newArray = new @T[this::len+1];
+		for (i in fromTo(0, this::len-1)) {
 			newArray[i] = this[i];
 		}
-		newArray[this.length()] = item;
+		newArray[this::len] = item;
 		return newArray;
 	}
 }
@@ -101,7 +101,7 @@ extend Int with PipeInput<Int> {
 	}
 }
 
-struct Printer<@T> { }
+const struct Printer<@T> { }
 
 extend Printer<@T> with PipeInput<@T> {
 	Void consume(@T s) {
