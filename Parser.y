@@ -66,7 +66,6 @@ Decl	: Func				{ Func $1 }
 Model	: model var '{' EFuncs '}'			{ Model { modelName = $2, typeparameters = [], methods = $4 } }
 	| model var '<' TParams '>' '{' EFuncs '}' 	{ Model { modelName = $2, typeparameters = $4, methods = $7 } }
 
-
 TParams	: '@' var ',' TParams		{ ($2 : $4) }
 	| '@' var			{ [$2] }
 
@@ -99,6 +98,7 @@ Parameter : Datatype var		{ ($2, $1) }
 
 Struct	: struct var '{' Fields '}'			{ Struct $2 [] $4 }
 	| struct var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 }
+	| struct var '<' TParams '>' '{' '}'		{ Struct $2 $4 [] }
 	| struct var '{' '}'				{ Struct $2 [] [] }
 
 Fields	: Parameter ';' Fields		{ ($1 : $3) }

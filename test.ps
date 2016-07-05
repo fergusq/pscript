@@ -15,6 +15,13 @@ extend Str with String {
 	}
 }
 
+extend Int with String {
+	Str toString() {
+		var todo = "<TODO>";
+		return todo;
+	}
+}
+
 model HasSize {
 	Int size();
 }
@@ -34,13 +41,6 @@ extend Str with HasSize {
 extend Array<@T> with HasSize {
 	Int size() {
 		return this.length();
-	}
-}
-
-extend Int with String {
-	Str toString() {
-		var todo = "<TODO>";
-		return todo;
 	}
 }
 
@@ -129,15 +129,13 @@ extend Int with PipeInput<Int> {
 	}
 }
 
-struct Printer { }
+struct Printer<@T> { }
 
-extend Printer with PipeInput<String> {
-	Void consume(String s) {
+extend Printer<@T> with PipeInput<@T> {
+	Void consume(@T s) {
 		s.print();
 	}
 }
-
-Printer printer() { return new Printer {}; }
 
 Int[] fromTo(Int from, Int to) {
 	var array = new Int[to-from+1];
@@ -168,4 +166,5 @@ Void main() {
 	"---".size().print();
 	[1,2,3].size().print();
 	[1,2,3].append(1) | 4;
+	[[1],[2],[3]] | new Printer<Int[]> {};
 }

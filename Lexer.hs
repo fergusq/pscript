@@ -50,6 +50,8 @@ data TokenClass
 
 lexer :: Int -> String -> [Token]
 lexer ln [] = []
+lexer ln ('/':'/':cs) = lexLineComment ln cs
+lexer ln ('/':'*':cs) = lexBlockComment ln cs
 lexer ln ('=':'=':cs) = Token ln TokenEqEq : lexer ln cs
 lexer ln ('!':'=':cs) = Token ln TokenNeq : lexer ln cs
 lexer ln ('=':cs) = Token ln TokenEq : lexer ln cs
@@ -85,13 +87,22 @@ lexer ln (c:cs)
 	| isDigit c = lexNum ln (c:cs)
 	| otherwise = error ("Illegal character: " ++ [c])
 
+lexLineComment ln ('\n':cs) = lexer (ln+1) cs
+lexLineComment ln (c:cs) = lexLineComment ln cs
+lexLineComment ln [] = []
+
+lexBlockComment ln ('\n':cs) = lexBlockComment (ln+1) cs
+lexBlockComment ln ('*':'/':cs) = lexer ln cs
+lexBlockComment ln (c:cs) = lexBlockComment ln cs
+lexBlockComment ln [] = error ("Unclosed comment on line " ++ show ln)
+
 lexString ln s ('"':cs) = Token ln (TokenString s) : lexer ln cs
 lexString ln s ('\\':'n':cs) = lexString ln (s ++ "\n") cs
 lexString ln s ('\\':'t':cs) = lexString ln (s ++ "\t") cs
 lexString ln s ('\\':'\\':cs) = lexString ln (s ++ "\\") cs
 lexString ln s ('\n':cs) = lexString (ln+1) (s ++ "\n") cs
 lexString ln s (c:cs) = lexString ln (s ++ [c]) cs
-lexString ln s [] = error ("Unclosed string: " ++ s)
+lexString ln s [] = error ("Unclosed string on line " ++ show ln ++ ": " ++ s)
 
 lexNum ln cs = Token ln (TokenInt (read num)) : lexer ln rest
 	where (num,rest) = span isDigit cs

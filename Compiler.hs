@@ -185,7 +185,7 @@ ensureMethodIsDefined dt model fname = do
     mf' <- getModelMethod model fname
     case mf' of
         Just mf -> conditionallyCreateMethod
-            (fname ++ "_" ++ pdt2str model ++ "_" ++ sname mf) $
+            (pdt2str dt ++ "_" ++ pdt2str model ++ "_" ++ sname mf) $
             compileStructMethod model mf dt
         Nothing -> tellError ("Unknown method `" ++ fname ++ "'")
 
@@ -305,18 +305,18 @@ compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields 
 
 compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
 compileStruct dt mname methods = do
-    lift $ generateHeaderCode ("struct " ++ mname ++ "{\n")
+    lift $ generateSuperHeaderCode ("struct " ++ mname ++ "{\n")
     forM_ methods $ \f ->
         let r = sreturnType f `ifDollar` dt
             ps = dt : map snd (sparameters f)
-        in lift $ generateHeaderCode ("    " ++
+        in lift $ generateSuperHeaderCode ("    " ++
             ctype r ('(':'*':sname f ++ ")(" ++ cparams ps ++ ")") ++ ";\n")
     case dt of
         PSum dts -> forM_ (combinations dts) $ \c ->
-            lift $ generateHeaderCode ("    " ++ ctype (sumOrModel c) (concatMap pdt2str c)
+            lift $ generateSuperHeaderCode ("    " ++ ctype (sumOrModel c) (concatMap pdt2str c)
                                        ++ ";\n")
         _ -> return ()
-    lift $ generateHeaderCode "    void *_obj;\n};\n"
+    lift $ generateSuperHeaderCode "    void *_obj;\n};\n"
 
 compileStructMethod :: PDatatype -> FSignature -> PDatatype -> Compiler ()
 compileStructMethod m mf dt = do
