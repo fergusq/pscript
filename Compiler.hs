@@ -292,11 +292,21 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
         forM_ fs (\f -> do
             mf' <- getModelMethod dt (name f)
             case mf' of
-                Nothing -> tellError ("Invalid extension of " ++ n ++ " with "
-                                      ++ name f ++ "(): no such method in " ++ show dt)
+                Nothing -> tellError ("invalid extension of " ++ n ++ " with method "
+                                      ++ name f ++ ": no such method in " ++ show dt)
                 Just mf -> do
                     let (Just etas) = forM tps (`Map.lookup` ss)
                     let edt = PInterface n etas
+                    forM_ (zip (returnType f:map snd (parameters f))
+                        (sreturnType mf:map snd (sparameters mf))) $
+                        \(dt', mpdt') -> do
+                            pdt <- substitute ss dt'
+                            let mpdt = mpdt' `ifDollar` edt
+                            unless (pdt == mpdt) $
+                                tellError ("extension method " ++ show edt ++ "." ++ name f ++
+                                           " does not satisfy the interface defined in " ++
+                                           show dt ++ ": expected " ++ show mpdt ++
+                                           ", got " ++ show pdt)
                     queueDecl ss $ Func f {
                         name = '_' : pdt2str edt ++ "_" ++ name f,
                         parameters = ("this", Typename n (map Typeparam tps)) : parameters f

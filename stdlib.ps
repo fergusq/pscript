@@ -1,7 +1,6 @@
 #ifndef _STDLIB_PS
 #define _STDLIB_PS
 
-//extern Str alloc(Int size);
 extern Void strcpy(Str d, Str s);
 extern Void strcat(Str d, Str s);
 extern Void sprintf(Str d, Str f, Int i);
@@ -23,6 +22,19 @@ extend Int with String {
 		var str = new Char*(20);
 		sprintf(str, "%d", this);
 		return str;
+	}
+}
+
+extend Array<@T> with String {
+	Str toString() {
+		var str = "[";
+		var i = 0;
+		for (item in this) {
+			if (i != 0) str = str + ", ";
+			str = str + item;
+			i = i + 1;
+		}
+		return str + "]";
 	}
 }
 
@@ -50,7 +62,7 @@ extend Str with Summable<String> {
 		strcat(newString, t.toString());
 		return newString;
 	}
-	Str sumIdentity() {
+	String sumIdentity() {
 		return "";
 	}
 }
@@ -113,6 +125,12 @@ struct List<@T> {
 extend List<@T> with HasSize {
 	Int size() {
 		return this::elements.size();
+	}
+}
+
+extend List<@T> with String {
+	Str toString() {
+		return "List { " + this::elements + " }";
 	}
 }
 
