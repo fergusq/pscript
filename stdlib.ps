@@ -1,6 +1,11 @@
 #ifndef _STDLIB_PS
 #define _STDLIB_PS
 
+//extern Str alloc(Int size);
+extern Void strcpy(Str d, Str s);
+extern Void strcat(Str d, Str s);
+extern Void sprintf(Str d, Str f, Int i);
+
 // STRING
 
 model String {
@@ -15,8 +20,38 @@ extend Str with String {
 
 extend Int with String {
 	Str toString() {
-		var todo = "<TODO>";
-		return todo;
+		var str = new Char*(20);
+		sprintf(str, "%d", this);
+		return str;
+	}
+}
+
+// SUMMABLE
+
+model Summable<@T> {
+	$ operator +(@T t);
+	@T sumIdentity();
+}
+
+extend String with Summable<String> {
+	String operator +(String t) {
+		return this.toString() + t;
+	}
+	
+	String sumIdentity() {
+		return this.sumIdentity();
+	}
+}
+
+extend Str with Summable<String> {
+	Str operator +(String t) {
+		var newString = new Char*(this.size()+t.size()+1);
+		strcpy(newString, this);
+		strcat(newString, t.toString());
+		return newString;
+	}
+	Str sumIdentity() {
+		return "";
 	}
 }
 
@@ -43,6 +78,29 @@ extend Str with HasSize {
 extend Array<@T> with HasSize {
 	Int size() {
 		return this::len;
+	}
+}
+
+// APPENDABLE
+
+model Appendable<@T> {
+	$ append(@T element);
+}
+
+extend Int with Appendable<Int> {
+	Int append(Int i) {
+		return this + i;
+	}
+}
+
+extend Array<@T> with Appendable<@T> {
+	@T[] append(@T item) {
+		var newArray = new @T[this::len+1];
+		for (i in fromTo(0, this::len-1)) {
+			newArray[i] = this[i];
+		}
+		newArray[this::len] = item;
+		return newArray;
 	}
 }
 
@@ -77,16 +135,36 @@ extend List<@T> with MutableList<@T> {
 	}
 	@T remove(Int index) {
 		var t = this[index];
-		var newList = new @T[this.size()-1];
+		var arr = new @T[this.size()-1];
 		var i = 0;
 		for (v in this::elements) {
 			if (i < index)
-				newList[i] = v;
+				arr[i] = v;
 			else if (i > index)
-				newList[i-1] = v;
+				arr[i-1] = v;
 		}
-		this::elements = newList;
+		this::elements = arr;
 		return t;
+	}
+}
+
+extend List<@T> with Summable<List<@T>> {
+	@T operator +(List<@T> l) {
+		var arr = new @T[this.size() + l.size()];
+		var i = 0;
+		for (v in this::elements) {
+			arr[i] = v;
+			i = i + 1;
+		}
+		for (v in l::elements) {
+			arr[i] = v;
+			i = i + 1;
+		}
+		return new List<@T> { arr };
+	}
+	
+	List<@T> sumIdentity() {
+		return new List<@T> { new @T[0] };
 	}
 }
 

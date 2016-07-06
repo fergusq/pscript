@@ -93,6 +93,18 @@ ExternFunc
 
 Op1	: '|'				{ "op_pipe" }
 	| '[' ']'			{ "op_get" }
+	| '+'				{ "op_add" }
+	| '-'				{ "op_sub" }
+	| '*'				{ "op_mul" }
+	| '/'				{ "op_div" }
+	| eq				{ "op_eq" }
+	| neq				{ "op_neq" }
+	| '<'				{ "op_lt" }
+	| '>'				{ "op_gt" }
+	| le				{ "op_le" }
+	| ge				{ "op_ge" }
+	| and				{ "op_and" }
+	| or				{ "op_or" }
 Op2	: '[' ']' '='			{ "op_set" }
 
 Params	: Parameter ',' Params		{ ($1 : $3) }
@@ -197,6 +209,7 @@ Prim	: int				{ Int $1 }
 	| new Datatype '[' Exp ']'	{ NewList $2 $4 }
 	| new Datatype '{' Args '}'	{ NewStruct $2 $4 }
 	| new Datatype '{' '}'		{ NewStruct $2 [] }
+	| new Datatype '*' '(' Exp ')'	{ NewPtrList $2 $5 }
 
 {
 parseError :: [Token] -> a
@@ -260,6 +273,7 @@ data Expression
 	| Call Expression [Expression]
 	| NewList Datatype Expression
 	| NewStruct Datatype [Expression]
+	| NewPtrList Datatype Expression
 	| FieldGet Expression String
 	| FieldSet Expression String Expression
 	deriving Show

@@ -91,6 +91,8 @@ checktype v f right cand@(PSum dts)
          generateCreate right v f
 checktype v f right@(PSum dts) cand
     = createModelObject v f right dts cand
+checktype v f right@(PInterface "Str" []) (PInterface "Pointer" [PInterface "Char" []]) =
+    generateCreate right v f
 checktype v f right cand = do
     es <- getExtends cand
     let PInterface _ ts = cand
@@ -420,6 +422,14 @@ compileStatement (Return expr)
 
 -- Lausekkeiden validaattorit
 
+compileExpressionAs :: PDatatype -> Expression -> Compiler String
+compileExpressionAs dt exp = do
+    var' <- tmpVar
+    dt' <- compileExpression var' exp
+    var <- tmpVar
+    checktype var var' dt dt'
+    return var
+
 compileExpression :: String -> Expression -> Compiler PDatatype
 compileExpression v (Int i) = do generateCreate pInteger v (show i)
                                  return pInteger
@@ -458,12 +468,9 @@ compileExpression v (List (expr:exprs))
 compileExpression v (NewList dt size)
     = do ss <- getCurrentSubs
          pdt <- substitute ss dt
-         var <- tmpVar
-         vt <- compileExpression var size
-         var' <- tmpVar
-         checktype var' var pInteger vt
-         generateCreate (pArray pdt) v ('{': var' ++ ", alloc("
-                                      ++ var'
+         var <- compileExpressionAs pInteger size
+         generateCreate (pArray pdt) v ('{': var ++ ", alloc("
+                                      ++ var
                                       ++ "*sizeof(" ++ ctype pdt "" ++ "))}")
          return (pArray pdt)
 compileExpression v (NewStruct dt fieldValues) = do
@@ -485,6 +492,14 @@ compileExpression v (NewStruct dt fieldValues) = do
         Nothing -> do
             tellError ("struct not found: " ++ show dt)
             return PNothing
+compileExpression v (NewPtrList dt size)
+    = do ss <- getCurrentSubs
+         pdt <- substitute ss dt
+         var <- compileExpressionAs pInteger size
+         generateCreate (pPointer pdt) v ("alloc("
+                                      ++ var
+                                      ++ "*sizeof(" ++ ctype pdt "" ++ "))")
+         return (pPointer pdt)
 compileExpression v (FieldGet obj field) = do
     var <- tmpVar
     dt <- compileExpression var obj
@@ -544,11 +559,6 @@ type MethodCallCompiler = String -> String
                      -> Compiler PDatatype
 
 compileMethodCall :: MethodCallCompiler
-
--- PString
-compileMethodCall v obj (PInterface "Str" []) "op_add" args
-    = do checkargs [pString] args
-         return pString
 
 -- PInteger
 compileMethodCall v obj (PInterface "Int" []) method args

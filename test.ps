@@ -54,29 +54,6 @@ extend Int with Duplicable {
 	}
 }
 
-// Appendable model
-
-model Appendable<@T> {
-	$ append(@T element);
-}
-
-extend Int with Appendable<Int> {
-	Int append(Int i) {
-		return this + i;
-	}
-}
-
-extend Array<@T> with Appendable<@T> {
-	@T[] append(@T item) {
-		var newArray = new @T[this::len+1];
-		for (i in fromTo(0, this::len-1)) {
-			newArray[i] = this[i];
-		}
-		newArray[this::len] = item;
-		return newArray;
-	}
-}
-
 // Pipe models
 
 model PipeOutput<@T> {
@@ -105,7 +82,7 @@ const struct Printer<@T> { }
 
 extend Printer<@T> with PipeInput<@T> {
 	Void consume(@T s) {
-		s.print();
+		("-> "+s).print();
 	}
 }
 
