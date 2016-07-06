@@ -289,14 +289,19 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                                 eMethods = fs, eTypeparameters = tps}) =
     when (null tps || not (null ss)) $ do
         dt <- substitute ss m
+        let (Just etas) = forM tps (`Map.lookup` ss)
+        let edt = PInterface n etas
+        ms <- getModelMethods dt
+        unless (length ms == length fs) $
+            tellError ("extension of " ++ show edt ++ " with " ++ show dt ++
+                       "does not satisfy the interface: there should be " ++ length ms ++
+                       ", not " ++ show length fs)
         forM_ fs (\f -> do
             mf' <- getModelMethod dt (name f)
             case mf' of
-                Nothing -> tellError ("invalid extension of " ++ n ++ " with method "
+                Nothing -> tellError ("invalid extension of " ++ show edt ++ " with method "
                                       ++ name f ++ ": no such method in " ++ show dt)
                 Just mf -> do
-                    let (Just etas) = forM tps (`Map.lookup` ss)
-                    let edt = PInterface n etas
                     forM_ (zip (returnType f:map snd (parameters f))
                         (sreturnType mf:map snd (sparameters mf))) $
                         \(dt', mpdt') -> do
