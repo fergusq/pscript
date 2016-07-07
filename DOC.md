@@ -30,17 +30,27 @@ It also supports `[]` and `[]=` -methods.
 
 `T[]` is equilevelent to `Array<T>`.
 
-#### The `List` structure
+#### The `ArrayList` structure
 
 ```
-struct List<@T> {
+struct ArrayList<@T> {
 	@T[] elements;
 }
 ```
 
-A mutable array.
+An array with mutable size. Supports `add` and `remove`-operations.
 
 ### Standard models
+
+#### The `Appendable` model
+
+```
+model Appendable<@T> {
+	$ append(@T element);
+}
+```
+
+Implementing types: `Array`, `ArrayList`.
 
 #### The `HasSize` model
 
@@ -52,7 +62,7 @@ model HasSize {
 
 Things that have size implement this model.
 
-Implementing types: `Array`, `List`, `Str`, `String`
+Implementing types: `Array`, `ArrayList`, `Str`, `String`
 
 #### The `Summable` model
 
@@ -66,7 +76,7 @@ model Summable<@T> {
 Althought the type system does not yet support this feature, it should be noted that `@T` shall be same as `$`, eg. the implementing type.
 Notably `Int` is not extended with this model due to some problems the author is having with the type system.
 
-Implementing types: `List`, `Str`, `String`
+Implementing types: `ArrayList`, `Str`, `String`
 
 #### The `String` model
 
@@ -79,4 +89,4 @@ model String {
 All types that can be converted to `Str` should be implement this model.
 `String` can generally be used in place of `Str` to enable implicite type conversion.
 
-Implementing types: `Array`, `Int`, `List`, `Str`
+Implementing types: `Array`, `ArrayList`, `Int`, `Str`

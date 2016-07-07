@@ -15,7 +15,7 @@ import Scope
 
 generateFunction :: PDatatype -> String -> [(String, PDatatype)] -> Compiler ()
 generateFunction rtype name params
-    = do let paramS = joinColon $ map (\(n,t) -> ctype t n) params
+    = do let paramS = joinComma $ map (\(n,t) -> ctype t n) params
              name' = name ++ "(" ++ paramS ++ ")"
          lift $ tell [ctype rtype name', "{\n"]
 
@@ -95,11 +95,7 @@ checktype v f right@(PInterface "Str" []) (PInterface "Pointer" [PInterface "Cha
     generateCreate right v f
 checktype v f right cand = do
     es <- getExtends cand
-    let PInterface _ ts = cand
-    ms <- mapM (\e -> do
-        let ss = Map.fromList $ zip (eTypeparameters e) ts
-        substitute ss $ model e
-     ) es
+    ms <- getSubstitutedExtends cand
     forM_ es $ ensureExtendIsDefined cand
     if right `elem` ms
         then createModelObject v f right [right] cand
@@ -291,11 +287,18 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
         dt <- substitute ss m
         let (Just etas) = forM tps (`Map.lookup` ss)
         let edt = PInterface n etas
+        prs <- getPrerequisites dt
+        es <- getSubstitutedExtends edt
+        forM_ prs $ \prt ->
+            unless (prt `elem` es) $
+                tellError ("extension of " ++ show edt ++ " with " ++ show dt ++
+                           " does not satisfy the interface: it does not implement " ++
+                           show prt ++ ", which is a prerequisite")
         ms <- getModelMethods dt
         unless (length ms == length fs) $
             tellError ("extension of " ++ show edt ++ " with " ++ show dt ++
-                       "does not satisfy the interface: there should be " ++ length ms ++
-                       ", not " ++ show length fs)
+                       "does not satisfy the interface: there should be " ++
+                       show (length ms) ++ ", not " ++ show (length fs))
         forM_ fs (\f -> do
             mf' <- getModelMethod dt (name f)
             case mf' of
@@ -356,12 +359,12 @@ compileStructMethod m mf dt = do
         ps' = ("*(("++ctype dt "*" ++")this->_obj)")
             : map fst (sparameters mf)
         signature = ctype mr
-            (pdt2str dt ++ "_" ++ pdt2str m ++ "_" ++ sname mf ++ "(" ++ joinColon ps ++ ")")
+            (pdt2str dt ++ "_" ++ pdt2str m ++ "_" ++ sname mf ++ "(" ++ joinComma ps ++ ")")
     lift $ generateHeaderCode (signature ++ ";\n")
     generateLater $ do
         lift $ generateCode (signature ++ " {\n")
         generateCreate r "_ret" ("_" ++ pdt2str dt ++ "_" ++ sname mf ++
-                                 "(" ++ joinColon ps' ++ ")")
+                                 "(" ++ joinComma ps' ++ ")")
         checktype "_ret2" "_ret" mr r
         generateReturn "_ret2"
         lift $ generateCode "\n}\n"
@@ -419,7 +422,7 @@ compileStatement (Expr (Call expr args))
          case dt of
             PInterface "Func" (retType:paramTypes)
                 -> do argcodes <- checkargs paramTypes args
-                      lift $ generateCode (var++"("++joinColon argcodes++");\n")
+                      lift $ generateCode (var++"("++joinComma argcodes++");\n")
                       return ()
             _ -> do typemismatch (pFunction PNothing []) dt
                     return ()
@@ -460,7 +463,7 @@ compileExpression v (Call expr args)
          case dt of
             PInterface "Func" (retType:paramTypes)
                 -> do argcodes <- checkargs paramTypes args
-                      generateCreate retType v (var++"("++joinColon argcodes++")")
+                      generateCreate retType v (var++"("++joinComma argcodes++")")
                       return retType
             _ -> do typemismatch (pFunction PNothing []) dt
                     return PNothing
@@ -502,7 +505,7 @@ compileExpression v (NewStruct dt fieldValues) = do
                 forM_ (zip fs' fieldvaluecodes) $ \((n, _), c) ->
                     generateAssign (v++"->"++n) c
              else
-                generateCreate pdt v ("{" ++ joinColon fieldvaluecodes ++ "}")
+                generateCreate pdt v ("{" ++ joinComma fieldvaluecodes ++ "}")
             return pdt
         Nothing -> do
             tellError ("struct not found: " ++ show dt)
@@ -650,7 +653,7 @@ compileMethodCall' v f n obj dt args = do
     let r = sreturnType f `ifDollar` dt
     argcodes <- checkargs (map snd (sparameters f)) args
     generateCreate r v
-        (n++"("++joinColon (obj:argcodes)++")")
+        (n++"("++joinComma (obj:argcodes)++")")
     return r
 
 coperator :: String -> String

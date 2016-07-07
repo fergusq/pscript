@@ -40,6 +40,7 @@ import Lexer
 	'>'		{ Token _ TokenGt }
 	','		{ Token _ TokenC }
 	';'		{ Token _ TokenSC }
+	':'		{ Token _ TokenColon }
 	'.'		{ Token _ TokenDot }
 	'$'		{ Token _ TokenDollar }
 	'&'		{ Token _ TokenAmp }
@@ -65,8 +66,10 @@ Decl	: Func				{ Func $1 }
 	| Extend			{ Ext $1 }
 	| Struct			{ Stc $1 }
 
-Model	: model var '{' EFuncs '}'			{ Model { modelName = $2, typeparameters = [], methods = $4 } }
-	| model var '<' TParams '>' '{' EFuncs '}' 	{ Model { modelName = $2, typeparameters = $4, methods = $7 } }
+Model	: model var '{' EFuncs '}'				{ Model $2 [] [] $4 }
+	| model var '<' TParams '>' '{' EFuncs '}' 		{ Model $2 $4 [] $7 }
+	| model var ':' DtList '{' EFuncs '}'			{ Model $2 [] $4 $6 }
+	| model var '<' TParams '>' ':' DtList  '{' EFuncs '}' 	{ Model $2 $4 $7 $9 }
 
 TParams	: '@' var ',' TParams		{ ($2 : $4) }
 	| '@' var			{ [$2] }
@@ -223,6 +226,7 @@ data Declaration =
 data Model = Model {
 	modelName :: String,
 	typeparameters :: [String],
+	prerequisites :: [Datatype],
 	methods :: [Function]
 } deriving Show
 

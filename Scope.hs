@@ -107,6 +107,14 @@ getModelMethods dt = do
     tellError $ show dt ++ " does not have methods"
     return []
 
+getPrerequisites :: PDatatype -> Compiler [PDatatype]
+getPrerequisites dt@(PInterface a _) = do
+    scope <- get
+    ss <- getSubstitutions dt
+    case Map.lookup a $ models scope of
+            Just m -> mapM (substitute ss) $ prerequisites m
+            Nothing -> return []
+
 getExtends :: PDatatype -> Compiler [Extend]
 getExtends dt@(PInterface a ts)
     = do scope <- get
@@ -121,6 +129,14 @@ getExtends PNothing = return [] -- virhe on annettu jo aiemmin
 getExtends dt = do
     tellError $ show dt ++ " does not have extensions"
     return []
+
+getSubstitutedExtends :: PDatatype -> Compiler [PDatatype]
+getSubstitutedExtends dt@(PInterface _ ts) = do
+    es <- getExtends dt
+    forM es (\e -> do
+        let ss = Map.fromList $ zip (eTypeparameters e) ts
+        substitute ss $ model e
+     )
 
 getDTypeMethods :: PDatatype -> Compiler [(Extend, FSignature)]
 getDTypeMethods dt@(PInterface _ ts)

@@ -110,6 +110,15 @@ extend Array<@T> with Appendable<@T> {
 	}
 }
 
+// LIST
+
+model List<@T> : HasSize {
+	@T operator [] (Int index);
+	Void operator []= (Int index, @T value);
+	Void add(@T value);
+	@T remove(Int index);
+}
+
 // ARRAYLIST
 
 struct ArrayList<@T> {
@@ -126,13 +135,6 @@ extend ArrayList<@T> with String {
 	Str toString() {
 		return "ArrayList { " + this::elements + " }";
 	}
-}
-
-model List<@T> {
-	@T operator [] (Int index);
-	Void operator []= (Int index, @T value);
-	Void add(@T value);
-	@T remove(Int index);
 }
 
 extend ArrayList<@T> with List<@T> {
@@ -177,6 +179,12 @@ extend ArrayList<@T> with Summable<ArrayList<@T>> {
 	
 	ArrayList<@T> sumIdentity() {
 		return new ArrayList<@T> { new @T[0] };
+	}
+}
+
+extend ArrayList<@T> with Appendable<@T> {
+	Void append(@T value) {
+		return new ArrayList<@T> { this::elements.append(value) };
 	}
 }
 

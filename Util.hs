@@ -24,8 +24,8 @@ joinChar _ [] = ""
 joinChar _ [p] = p
 joinChar c (p:ps) = p ++ (c:joinChar c ps)
 
-joinColon :: [String] -> String
-joinColon = joinChar ','
+joinComma :: [String] -> String
+joinComma = joinChar ','
 
 collapse :: (Ord k) => [(k, a)] -> Map.Map k [a]
 collapse = foldr (\(k, v) m -> Map.insert k (v : fromMaybe [] (Map.lookup k m)) m) Map.empty

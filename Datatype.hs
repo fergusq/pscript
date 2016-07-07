@@ -73,7 +73,7 @@ pdt2str PNothing = "<nothing>"
 
 instance Show PDatatype where
     show (PInterface a []) = a
-    show (PInterface a as) = a ++ "<" ++ joinColon (map pdt2str as) ++ ">"
+    show (PInterface a as) = a ++ "<" ++ joinComma (map pdt2str as) ++ ">"
     show (PSum dts) = joinChar '&' (sort $ map pdt2str dts)
     show PDollar = "$"
     show PNothing = "<nothing>"
