@@ -64,6 +64,19 @@ Things that have size implement this model.
 
 Implementing types: `Array`, `ArrayList`, `Str`, `String`
 
+#### The `List` model
+
+```
+model List<@T> : HasSize {
+	@T operator [] (Int index);
+	Void operator []= (Int index, @T value);
+	Void add(@T value);
+	@T remove(Int index);
+}
+```
+
+Implementing typs: `ArrayList`
+
 #### The `Summable` model
 
 ```

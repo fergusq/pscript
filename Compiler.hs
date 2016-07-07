@@ -615,11 +615,13 @@ compileMethodCall v obj (PInterface "Pointer" [dt]) method args
     | method == "op_get"
         = do (index:vars) <- checkargs [pInteger] args
              generateCreate dt v (obj ++ "["++index++"]")
+             tellWarning "pointer arithmetic is not typesafe"
              return dt
     | method == "op_set"
         = do (index:value:vars) <- checkargs [pInteger, dt] args
              generateAssign (obj ++ "["++index++"]") value
              generateCreate dt v value
+             tellWarning "pointer arithmetic is not typesafe"
              return dt
 
 -- Määrittelemättömät metodit

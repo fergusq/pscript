@@ -7,6 +7,7 @@ import System.Exit
 
 import Lexer
 import Parser
+import Scope
 import Compiler
 
 compileCode c = do
@@ -17,9 +18,15 @@ compileCode c = do
     forM_ sheader putStr
     forM_ header putStr
     forM_ code putStr
-    forM_ errors (hPutStrLn stderr)
+    errs <- forM errors $ \e -> case e of
+        ErrorMsg EErr place msg -> hPutStrLn stderr ("[" ++ place ++ "] error: " ++ msg)
+            >> return 1
+        ErrorMsg EWarn place msg -> hPutStrLn stderr ("[" ++ place ++ "] warning: " ++ msg)
+            >> return 0
+        ErrorMsg ENote place msg -> hPutStrLn stderr ("[" ++ place ++ "] note: " ++ msg)
+            >> return 0
     putStrLn ""
-    when (length errors > 0) exitFailure
+    when (sum errs > 0) exitFailure
 
 main = do c <- getContents
           compileCode c
