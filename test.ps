@@ -88,6 +88,14 @@ extend Printer<@T> with PipeInput<@T> {
 
 //
 
+extend Int with Appendable<Int> {
+	Int append(Int i) {
+		return this + i;
+	}
+}
+
+//
+
 Int[] fromTo(Int from, Int to) {
 	var array = new Int[to-from+1];
 	var i = 0;
@@ -118,7 +126,7 @@ Void main() {
 	[1,2,3].size().print();
 	[1,2,3].append(1) | 4;
 	[[1],[2],[3]] | new Printer<Int[]> {};
-	var list = new List<Int> { [1, 2, 3] };
+	var list = new ArrayList<Int> { [1, 2, 3] };
 	list.add(99);
 	list::elements | new Printer<Int> {};
 }

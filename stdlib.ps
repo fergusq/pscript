@@ -99,12 +99,6 @@ model Appendable<@T> {
 	$ append(@T element);
 }
 
-extend Int with Appendable<Int> {
-	Int append(Int i) {
-		return this + i;
-	}
-}
-
 extend Array<@T> with Appendable<@T> {
 	@T[] append(@T item) {
 		var newArray = new @T[this::len+1];
@@ -116,32 +110,32 @@ extend Array<@T> with Appendable<@T> {
 	}
 }
 
-// LIST
+// ARRAYLIST
 
-struct List<@T> {
+struct ArrayList<@T> {
 	@T[] elements;
 }
 
-extend List<@T> with HasSize {
+extend ArrayList<@T> with HasSize {
 	Int size() {
 		return this::elements.size();
 	}
 }
 
-extend List<@T> with String {
+extend ArrayList<@T> with String {
 	Str toString() {
-		return "List { " + this::elements + " }";
+		return "ArrayList { " + this::elements + " }";
 	}
 }
 
-model MutableList<@T> {
+model List<@T> {
 	@T operator [] (Int index);
 	Void operator []= (Int index, @T value);
 	Void add(@T value);
 	@T remove(Int index);
 }
 
-extend List<@T> with MutableList<@T> {
+extend ArrayList<@T> with List<@T> {
 	@T operator [](Int index) {
 		return this::elements[index];
 	}
@@ -166,8 +160,8 @@ extend List<@T> with MutableList<@T> {
 	}
 }
 
-extend List<@T> with Summable<List<@T>> {
-	@T operator +(List<@T> l) {
+extend ArrayList<@T> with Summable<ArrayList<@T>> {
+	@T operator +(ArrayList<@T> l) {
 		var arr = new @T[this.size() + l.size()];
 		var i = 0;
 		for (v in this::elements) {
@@ -178,11 +172,11 @@ extend List<@T> with Summable<List<@T>> {
 			arr[i] = v;
 			i = i + 1;
 		}
-		return new List<@T> { arr };
+		return new ArrayList<@T> { arr };
 	}
 	
-	List<@T> sumIdentity() {
-		return new List<@T> { new @T[0] };
+	ArrayList<@T> sumIdentity() {
+		return new ArrayList<@T> { new @T[0] };
 	}
 }
 
