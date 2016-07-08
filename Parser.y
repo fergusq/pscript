@@ -46,6 +46,7 @@ import Lexer
 	'&'		{ Token _ TokenAmp }
 	'@'		{ Token _ TokenAt }
 	'|'		{ Token _ TokenPipe }
+	'%'		{ Token _ TokenPercent }
 	arrow		{ Token _ TokenArrow }
 	eq		{ Token _ TokenEqEq }
 	neq		{ Token _ TokenNeq }
@@ -100,6 +101,7 @@ Op1	: '|'				{ "op_pipe" }
 	| '-'				{ "op_sub" }
 	| '*'				{ "op_mul" }
 	| '/'				{ "op_div" }
+	| '%'				{ "op_mod" }
 	| eq				{ "op_eq" }
 	| neq				{ "op_neq" }
 	| '<'				{ "op_lt" }
@@ -196,6 +198,7 @@ Sum	: Sum '+' Term			{ MethodCall $1 "op_add" [$3] }
 
 Term	: Term '*' Pipe			{ MethodCall $1 "op_mul" [$3] }
 	| Term '/' Pipe			{ MethodCall $1 "op_div" [$3] }
+	| Term '%' Pipe			{ MethodCall $1 "op_mod" [$3] }
 	| Pipe				{ $1 }
 
 Pipe	: Pipe '|' Preprim		{ MethodCall $1 "op_pipe" [$3] }

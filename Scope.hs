@@ -34,7 +34,8 @@ data VarScope = VarScope {
     functionName :: String,
     variables :: Map.Map String PDatatype,
     expectedReturnType :: PDatatype,
-    subs :: Subs
+    subs :: Subs,
+    doesReturn :: Bool
 }
 
 putVar :: String -> PDatatype -> Compiler ()
@@ -43,14 +44,6 @@ putVar name dtype = do scope <- get
                            m = variables vscope
                            m' = Map.insert name dtype m
                        put scope { varscope = vscope { variables = m' } }
-
-saveScope :: Compiler VarScope
-saveScope = do scope <- get
-               return $ varscope scope
-
-restoreScope :: VarScope -> Compiler ()
-restoreScope vscope = do scope <- get
-                         put scope { varscope = vscope }
 
 getVar :: String -> Compiler (Maybe PDatatype)
 getVar name = do scope <- get
@@ -63,6 +56,14 @@ getVarOrError name = do t <- getVar name
                             Nothing -> do tellError ("Variable not found: " ++ name)
                                           return PNothing
 
+saveScope :: Compiler VarScope
+saveScope = do scope <- get
+               return $ varscope scope
+
+restoreScope :: VarScope -> Compiler ()
+restoreScope vscope = do scope <- get
+                         put scope { varscope = vscope }
+
 getExpectedReturnType :: Compiler PDatatype
 getExpectedReturnType = do scope <- get
                            return $ expectedReturnType $ varscope scope
@@ -70,6 +71,14 @@ getExpectedReturnType = do scope <- get
 getCurrentFunctionName :: Compiler String
 getCurrentFunctionName = do scope <- get
                             return $ functionName $ varscope scope
+
+doesThisPathReturn :: Compiler Bool
+doesThisPathReturn = get >>= \scope -> return $ doesReturn $ varscope scope
+
+thisPathReturns :: Compiler ()
+thisPathReturns = do
+    scope@Scope { varscope = vs } <- get
+    put scope { varscope = vs { doesReturn = True }}
 
 getSubstitutions :: PDatatype -> Compiler Subs
 getSubstitutions dt@(PInterface n ts) = do
@@ -140,6 +149,12 @@ getSubstitutedExtends dt@(PInterface _ ts) = do
         let ss = Map.fromList $ zip (eTypeparameters e) ts
         substitute ss $ model e
      )
+
+getSubstitutedExtends PNothing = return []
+
+getSubstitutedExtends dt = do
+    tellError $ show dt ++ " does not have extensions"
+    return []
 
 getDTypeMethods :: PDatatype -> Compiler [(Extend, FSignature)]
 getDTypeMethods dt@(PInterface _ ts)

@@ -110,9 +110,24 @@ extend Array<@T> with Appendable<@T> {
 	}
 }
 
+// CONTAINER
+
+model Container<@T> {
+	Bool contains(@T value);
+}
+
+extend Array<@T> with Container<@T> {
+	Bool contains(@T value) {
+		for (item in this) {
+			if (item == value) return true;
+		}
+		return false;
+	}
+}
+
 // LIST
 
-model List<@T> : HasSize {
+model List<@T> : HasSize, Container<@T> {
 	@T operator [] (Int index);
 	Void operator []= (Int index, @T value);
 	Void add(@T value);
@@ -134,6 +149,12 @@ extend ArrayList<@T> with HasSize {
 extend ArrayList<@T> with String {
 	Str toString() {
 		return "ArrayList { " + this::elements + " }";
+	}
+}
+
+extend ArrayList<@T> with Container<@T> {
+	Bool contains(@T value) {
+		return this::elements.contains(value);
 	}
 }
 

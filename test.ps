@@ -129,4 +129,14 @@ Void main() {
 	var list = new ArrayList<Int> { [1, 2, 3] };
 	list.add(99);
 	list::elements | new Printer<Int> {};
+	
+	var primes = new ArrayList<Int> { [2, 3] };
+	for (i in fromTo(4, 100)) {
+		var isPrime = true;
+		for (prime in primes::elements) {
+			if (i % prime == 0) isPrime = false;
+		}
+		if (isPrime) primes.add(i);
+	}
+	puts(primes.toString());
 }
