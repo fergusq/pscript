@@ -86,6 +86,18 @@ extend Printer<@T> with PipeInput<@T> {
 	}
 }
 
+model AddingPrinter<@T> {
+	Void print(@T value);
+}
+
+const struct AddingPrinterImpl<@T> { @T prefix; }
+
+extend AddingPrinterImpl<@T> with AddingPrinter<@T> {
+	Void print(@T value) {
+		puts((this::prefix + value).toString());
+	}
+}
+
 //
 
 extend Int with Appendable<Int> {
@@ -139,4 +151,13 @@ Void main() {
 		if (isPrime) primes.add(i);
 	}
 	puts(primes.toString());
+	
+	var intPrinter = new AddingPrinterImpl<Int> { 5 };
+	intPrinter.print(3); // prints 8
+
+	var strPrinter = new AddingPrinterImpl<String> { ":) " };
+	strPrinter.print("hello"); // prints :) hello
+	
+	//var boolPrinter = new AddingPrinterImpl<Bool> { true };
+	//boolPrinter.print(true);
 }
