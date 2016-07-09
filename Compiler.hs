@@ -508,6 +508,22 @@ compileExpression v expdt (List (expr:exprs))
                                generateAssign (v ++ ".ptr["++show i++"]") var'
                ) (zip [1..length exprs] exprs)
          return (pArray dt)
+compileExpression v expdt (Range from to)
+    = do fromv <- compileExpressionAs pInteger from
+         tov <- compileExpressionAs pInteger to
+         sizev <- tmpVar
+         generateCreate pInteger sizev (tov ++ "-" ++ fromv ++ "+1")
+         generateCreate (pArray pInteger) v
+            ('{': sizev ++ ", alloc("
+            ++ sizev
+            ++ "*sizeof(" ++ ctype pInteger "" ++ "))}")
+         countv <- tmpVar
+         generateCreate pInteger countv "0"
+         generateWhile (countv ++ "<" ++ sizev)
+         generateAssign (v ++ ".ptr[" ++ countv ++ "]") (fromv ++ "+" ++ countv)
+         generateAssign countv (countv ++ "+1")
+         generateEnd
+         return (pArray pInteger)
 compileExpression v expdt (NewList dt size)
     = do ss <- getCurrentSubs
          pdt <- substitute ss dt

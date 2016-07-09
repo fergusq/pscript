@@ -47,6 +47,7 @@ data TokenClass
 	| TokenAnd
 	| TokenOr
 	| TokenDot
+	| TokenDotDot
 	| TokenDollar
 	| TokenAt
 	| TokenField
@@ -81,6 +82,7 @@ lexer ln ('&':'&':cs) = Token ln TokenAnd : lexer ln cs
 lexer ln ('|':'|':cs) = Token ln TokenOr : lexer ln cs
 lexer ln ('&':cs) = Token ln TokenAmp : lexer ln cs
 lexer ln ('|':cs) = Token ln TokenPipe : lexer ln cs
+lexer ln ('.':'.':cs) = Token ln TokenDotDot : lexer ln cs
 lexer ln ('.':cs) = Token ln TokenDot : lexer ln cs
 lexer ln ('$':cs) = Token ln TokenDollar : lexer ln cs
 lexer ln ('@':cs) = Token ln TokenAt : lexer ln cs

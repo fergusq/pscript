@@ -56,6 +56,7 @@ import Lexer
 	and		{ Token _ TokenAnd }
 	or		{ Token _ TokenOr }
 	field		{ Token _ TokenField }
+	dotdot		{ Token _ TokenDotDot }
 
 %%
 
@@ -214,6 +215,7 @@ Prim	: int				{ Int $1 }
 	| var				{ Var $1 }
 	| '(' Exp ')'			{ $2 }
 	| '[' Args ']'			{ List $2 }
+	| '[' Exp dotdot Exp ']'	{ Range $2 $4 }
 	| new Datatype '[' Exp ']'	{ NewList $2 $4 }
 	| new Datatype '{' Args '}'	{ NewStruct $2 $4 }
 	| new Datatype '{' '}'		{ NewStruct $2 [] }
@@ -280,6 +282,7 @@ data Expression
 	| Str String
 	| Var String
 	| List [Expression]
+	| Range Expression Expression
 	| Call Expression [Expression]
 	| NewList Datatype Expression
 	| NewStruct Datatype [Expression]
