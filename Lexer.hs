@@ -8,6 +8,7 @@ data TokenClass
 	| TokenIn
 	| TokenIf
 	| TokenElse
+	| TokenWhile
 	| TokenReturn
 	| TokenExtern
 	| TokenModel
@@ -121,6 +122,7 @@ lexVar ln cs =
 		("var",rest)     -> Token ln TokenVar : lexer ln rest
 		("if",rest)      -> Token ln TokenIf : lexer ln rest
 		("else",rest)    -> Token ln TokenElse : lexer ln rest
+		("while",rest)   -> Token ln TokenWhile : lexer ln rest
 		("return",rest)  -> Token ln TokenReturn : lexer ln rest
 		("extern",rest)  -> Token ln TokenExtern : lexer ln rest
 		("model",rest)   -> Token ln TokenModel : lexer ln rest

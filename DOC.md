@@ -146,7 +146,7 @@ What happens if we try to make an instance of `AddingPrinterImpl<Bool>`?
 
 ```
 var boolPrinter = new AddingPrinterImpl<Bool> { true };
-boolPrinter.print("false");
+boolPrinter.print(true);
 ```
 
 `Bool` does not have method `operator +`. The compiler will give the following error:

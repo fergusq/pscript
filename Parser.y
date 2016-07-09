@@ -13,6 +13,7 @@ import Lexer
 	let		{ Token _ TokenVar }
 	if		{ Token _ TokenIf }
 	else		{ Token _ TokenElse }
+	while		{ Token _ TokenWhile }
 	return		{ Token _ TokenReturn }
 	extern		{ Token _ TokenExtern }
 	model		{ Token _ TokenModel }
@@ -152,6 +153,7 @@ Stmt	: Call ';'			{ Expr $1 }
 	| for '(' var in Exp ')' Stmt	{ For $3 $5 $7 }
 	| if '(' Exp ')' Stmt		{ If $3 $5 Nothing }
 	| if '(' Exp ')' Stmt else Stmt	{ If $3 $5 (Just $7) }
+	| while '(' Exp ')' Stmt	{ While $3 $5 }
 	| let var '=' Exp ';'		{ Create $2 $4 }
 	| var '=' Exp ';'		{ Assign $1 $3 }
 	| return Exp ';'		{ Return $2 }
@@ -267,6 +269,7 @@ data Statement
 	| Block [Statement]
 	| For String Expression Statement
 	| If Expression Statement (Maybe Statement)
+	| While Expression Statement
 	| Return Expression
 	| Extern
 	deriving Show

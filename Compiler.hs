@@ -100,10 +100,11 @@ checktype v f right cand = do
     if right `elem` ms
         then createModelObject v f right [right] cand
         else case (right, cand) of
-        (PInterface "Array" [t], PInterface "Array" [u]) -> do
+        (PInterface "Array" [t], PInterface "Array" [u]) ->
+           if t /= u then do
             generateCreate right v
                 ('{': f ++ ".len, alloc(" ++ f ++ ".len*sizeof("
-                ++ ctype right "" ++ "))}")
+                ++ ctype t "" ++ "))}")
             generateAssign (v++".len") (f++".len")
             ctr <- tmpVar
             generateCreate pInteger ctr "0"
@@ -113,6 +114,8 @@ checktype v f right cand = do
             generateAssign (v++".ptr["++ctr++"]") var
             generateAssign ctr (ctr ++ "+1")
             generateEnd
+           else
+            generateCreate right v f
         _ -> do
             unless (cand == right) (typemismatch right cand)
             generateCreate right v f
@@ -417,6 +420,13 @@ compileStatement (If expr thenBody elseBody)
             Nothing -> return False -- ei elseä, ei returnia
          -- jos molemmissa osissa on return, tämä if poistuu funktiosta varmasti
          when (thenReturns && elseReturns) thisPathReturns
+         generateEnd
+compileStatement (While expr body)
+    = do var <- compileExpressionAs pBool expr
+         generateWhile var
+         scope <- saveScope
+         compileStatement body
+         restoreScope scope
          generateEnd
 compileStatement (For name expr body)
     = do var <- tmpVar

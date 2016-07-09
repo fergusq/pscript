@@ -209,4 +209,16 @@ extend ArrayList<@T> with Appendable<@T> {
 	}
 }
 
+// FROMTO
+
+Int[] fromTo(Int from, Int to) {
+	var array = new Int[to-from+1];
+	var i = 0;
+	for (value in array) {
+		array[i] = from+i;
+		i = i + 1;
+	}
+	return array;
+}
+
 #endif
