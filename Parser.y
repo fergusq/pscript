@@ -171,8 +171,8 @@ Call	: var '(' Args ')'		{ Call $1 $3 }
 	| Preprim '[' Exp ']' '=' Exp	{ MethodCall $1 "op_set" [$3, $6] }
 	| Preprim '.' var '(' Args ')'	{ MethodCall $1 $3 $5 }
 	| Preprim '.' var '(' ')'	{ MethodCall $1 $3 [] }
-	| Preprim field var		{ FieldGet $1 $3 }
-	| Preprim field var '=' Exp	{ FieldSet $1 $3 $5 }
+	| Preprim '.' var		{ FieldGet $1 $3 }
+	| Preprim '.' var '=' Exp	{ FieldSet $1 $3 $5 }
 	
 
 Args	: Exp ',' Args			{ ($1 : $3) }

@@ -38,7 +38,8 @@ generateEnd
 generateCreate :: PDatatype -> String -> String -> Compiler ()
 generateCreate dt var value
     = do lift $ tell ["    ", ctype dt var,"=",value,";\n"]
-         ensureStructIsDefined dt
+         ensureStructIsDefined dt -- varmistetaan, että kaikki tyypin käsittelemiseen
+                                  -- tarvittavat c-tietorakenteet ja funktiot on generoitu
 
 generateAssign :: String -> String -> Compiler ()
 generateAssign var value
@@ -84,50 +85,65 @@ typemismatch right wrong
     = unless (right == PNothing || wrong == PNothing)
         (tellError ("type mismatch: can't cast " ++ show wrong ++ " to " ++ show right))
 
+-- toteuttaa tarvittavat tyyppimuunnokset
+-- luo uuden muuttujan ensimmäisen parametrin nimisenä
 checktype :: String -> String -> PDatatype -> PDatatype -> Compiler ()
 
+-- intersektiotyypin muuntaminen sen osaksi (esim. A&B -> A) ei vielä onnistu
 checktype v f right cand@(PSum dts)
     = do unless (cand == right) (typemismatch right cand)
          generateCreate right v f
+-- tyypin muuntaminen intersektiotyypiksi
 checktype v f right@(PSum dts) cand
     = createModelObject v f right dts cand
+-- muunnos Char* -> Str
 checktype v f right@(PInterface "Str" []) (PInterface "Pointer" [PInterface "Char" []]) =
     generateCreate right v f
+-- muunnos Str -> Char*
+checktype v f right@(PInterface "Pointer" [PInterface "Char" []]) (PInterface "Str" []) =
+    generateCreate right v f
+-- muut muunnokset
 checktype v f right cand = do
+    -- varmistetaan, että tyypin laajennokset on generoitu
     es <- getExtends cand
-    ms <- getSubstitutedExtends cand
     forM_ es $ ensureExtendIsDefined cand
-    if right `elem` ms
-        then createModelObject v f right [right] cand
-        else case (right, cand) of
-        (PInterface "Array" [t], PInterface "Array" [u]) ->
-           if t /= u then do
-            generateCreate right v
-                ('{': f ++ ".len, alloc(" ++ f ++ ".len*sizeof("
-                ++ ctype t "" ++ "))}")
-            generateAssign (v++".len") (f++".len")
-            ctr <- tmpVar
-            generateCreate pInteger ctr "0"
-            generateWhile (ctr++"<"++f++".len")
-            var <- tmpVar
-            checktype var (f++".ptr["++ctr++"]") t u
-            generateAssign (v++".ptr["++ctr++"]") var
-            generateAssign ctr (ctr ++ "+1")
-            generateEnd
-           else
-            generateCreate right v f
-        _ -> do
-            unless (cand == right) (typemismatch right cand)
-            generateCreate right v f
+    -- jos tyypit ovat samat, tyyppimuunnosta ei tarvitse tehdä
+    if right == cand then
+        generateCreate right v f
+     else do
+        -- katsotaan yritetäänkö tyyppiä muuttaa mallityypiksi
+        ms <- getSubstitutedExtends cand
+        if right `elem` ms
+         then createModelObject v f right [right] cand
+         -- jos ei, katsotaan voidaanko array muuttaa kovarianttiutensa takia
+         else case (right, cand) of
+            (PInterface "Array" [t], PInterface "Array" [u]) -> do
+                generateCreate right v
+                    ('{': f ++ ".len, alloc(" ++ f ++ ".len*sizeof("
+                    ++ ctype t "" ++ "))}")
+                generateAssign (v++".len") (f++".len")
+                ctr <- tmpVar
+                generateCreate pInteger ctr "0"
+                generateWhile (ctr++"<"++f++".len")
+                var <- tmpVar
+                checktype var (f++".ptr["++ctr++"]") t u
+                generateAssign (v++".ptr["++ctr++"]") var
+                generateAssign ctr (ctr ++ "+1")
+                generateEnd
+            -- muissa tapauksissa tyyppimuunnosta ei voida tehdä
+            _ -> typemismatch right cand
 
+-- luodaan malli- tai intersektiotyypin olio
 createModelObject :: String -> String -> PDatatype -> [PDatatype]
                      -> PDatatype -> Compiler ()
 createModelObject v f dt models from = do
     generateCreate dt v ("alloc(sizeof(struct _"++pdt2str dt++"))")
     ms <- concat <$> mapM getModelMethods models
+    -- tallennetaan olion vtableen metodipointterit
     forM_ ms $ \m -> do
         generateAssign (v++"->"++sname m) (pdt2str from++'_':pdt2str dt++'_':sname m)
         ensureMethodIsDefined from dt (sname m)
+    -- luodaan alatyyppien oliot (tätä voisi vähän optimoida)
     when (length models > 1) $ forM_ (combinations models) $ \c -> do
         var <- tmpVar
         createModelObject var f (sumOrModel c) c from
@@ -139,6 +155,7 @@ sumOrModel :: [PDatatype] -> PDatatype
 sumOrModel [t] = t
 sumOrModel ts = PSum ts
 
+-- kääntää listan lausekkeita ja muuntaa arvot annetuiksi tyypeiksi
 checkargs :: [PDatatype] -> [Expression] -> Compiler [String]
 checkargs paramTs args = if length paramTs /= length args
                             then do tellError ("wrong number of arguments: "
@@ -148,9 +165,11 @@ checkargs paramTs args = if length paramTs /= length args
                             else forM (zip paramTs args)
                                   (\(t,v) -> compileExpressionAs t v)
 
+-- varmistaa, että tyypin vaatimat C-structit ja funktiot on luotu
 ensureStructIsDefined :: PDatatype -> Compiler ()
 ensureStructIsDefined dt =
     case dt of
+        -- array tarvitsee oman structinsa
         PInterface "Array" [a] -> do
             let n = "_Array1" ++ pdt2str a
             conditionallyCreateStruct n $ do
@@ -160,13 +179,18 @@ ensureStructIsDefined dt =
                     ("struct "++n++"{int len;" ++ ctype a "*ptr" ++ ";};\n")
         dt@(PInterface t as@(p:ps)) -> do
             scope <- get
+            -- luodaan tyypin laajennokset, jos niitä ei ole jo luotu
+            -- tämä tehdään vähän purkasti tässä funktiossa...
             es <- getExtends dt
             forM_ es $ ensureExtendIsDefined dt
+            -- luotavan structin nimi
             let n = pdt2str dt
+            -- luodaan malliolion struct, jos tyyppi on malli
             when (isJust $ Map.lookup t $ models scope) $
                 conditionallyCreateStruct n $ do
                     methods <- getModelMethods dt
                     compileStruct dt n methods
+            -- jos tyyppi on struct, luodaan sille oma C-struct
             let s = Map.lookup t $ structs scope
             case s of
                 Just s' ->
@@ -174,6 +198,8 @@ ensureStructIsDefined dt =
                         ss <- getSubstitutions dt
                         queueDecl ss (Stc s')
                 _ -> return ()
+        -- intersektiotyypin struct on samanlainen kuin malliolion, mutta sen
+        -- vtable sisältää kaikkien mallien metodit
         dt@(PSum dts) -> do
             let n = pdt2str dt
             conditionallyCreateStruct n $ do
@@ -181,6 +207,11 @@ ensureStructIsDefined dt =
                 compileStruct dt n methods
         _   -> return ()
 
+-- varmistaa, että tietyn malli- tai intersektiotyypin metodi on olemassa
+-- tämä on siis sellainen funktio, joka muuntaa mallin tai intersektiotyypin
+-- olion varsinaiseksi arvoksi, joka sitten annetaan varsinaiselle metodifunktiolle
+-- esim. dt=Int, model=String, fname=toString, muuntaa Stringin Intiksi ja antaa sen
+-- metodille Int_toString
 ensureMethodIsDefined :: PDatatype -> PDatatype -> String -> Compiler ()
 ensureMethodIsDefined dt model fname = do
     mf' <- getModelMethod model fname
@@ -190,6 +221,7 @@ ensureMethodIsDefined dt model fname = do
             compileStructMethod model mf dt
         Nothing -> tellError ("Unknown method `" ++ fname ++ "'")
 
+-- varmistaa, että tyyppiparametrisoidun laajennoksen haluttu versio generoidaan
 ensureExtendIsDefined :: PDatatype -> Extend -> Compiler ()
 ensureExtendIsDefined dt@(PInterface _ ts) extend = unless (null $ eTypeparameters extend) $ do
     let ss = Map.fromList $ zip (eTypeparameters extend) ts
@@ -343,16 +375,19 @@ compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields 
             lift $ generateSuperHeaderCode ("    " ++ ctype ftype' fname ++ ";\n")
         lift $ generateSuperHeaderCode "};\n"
 
+-- generoi malli- tai intersektiotyypin structin
 compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
 compileStruct dt mname methods = do
     lift $ generateSuperHeaderCode ("typedef struct _" ++ mname ++ "* " ++
                                     mname ++ ";\n")
     lift $ generateSuperHeaderCode ("struct _" ++ mname ++ "{\n")
+    -- generoidaan vtable
     forM_ methods $ \f ->
         let r = sreturnType f `ifDollar` dt
             ps = dt : map snd (sparameters f)
         in lift $ generateSuperHeaderCode ("    " ++
             ctype r ('(':'*':sname f ++ ")(" ++ cparams ps ++ ")") ++ ";\n")
+    -- generoidaan kombinaatioiden oliot
     case dt of
         PSum dts -> forM_ (combinations dts) $ \c ->
             lift $ generateSuperHeaderCode ("    " ++ ctype (sumOrModel c) (concatMap pdt2str c)
@@ -360,6 +395,9 @@ compileStruct dt mname methods = do
         _ -> return ()
     lift $ generateSuperHeaderCode "    void *_obj;\n};\n"
 
+-- generoi funktion, joka ottaa malli- tai intersektiotyypin sekä argumentteja
+-- ja muuntaa mallin tai intersektion oikeaan muotoon dereferoimalla _obj-kentän
+-- ja syöttää kaikki arvot varsinaiselle metodifunktiolle
 compileStructMethod :: PDatatype -> FSignature -> PDatatype -> Compiler ()
 compileStructMethod m mf dt = do
     let mr = sreturnType mf `ifDollar` m
@@ -473,8 +511,9 @@ compileCall name args = do
             tellError ("function not found: `" ++ name ++ "'")
             return (PNothing, "NOTHING")
 
--- Lausekkeiden validaattorit
+-- Lausekkeiden kääntäjät
 
+-- kääntää lausekkeen ja muuttaa sen halutun tyyppiseksi
 compileExpressionAs :: PDatatype -> Expression -> Compiler String
 compileExpressionAs dt exp = do
     var' <- tmpVar
