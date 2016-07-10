@@ -160,6 +160,8 @@ ensureStructIsDefined dt =
                     ("struct "++n++"{int len;" ++ ctype a "*ptr" ++ ";};\n")
         dt@(PInterface t as@(p:ps)) -> do
             scope <- get
+            es <- getExtends dt
+            forM_ es $ ensureExtendIsDefined dt
             let n = pdt2str dt
             when (isJust $ Map.lookup t $ models scope) $
                 conditionallyCreateStruct n $ do
@@ -198,10 +200,11 @@ ensureExtendIsDefined dt@(PInterface _ ts) extend = unless (null $ eTypeparamete
 
 compile :: [Declaration] -> Generator ()
 compile decls = do
-    let pvars = ("true",pBool):("false",pBool):map decl2pvar
-                    (concatMap (\d -> case d of
-                                    Func f -> [f]
-                                    _     -> []) decls)
+    let pvars = [("true",pBool), ("false",pBool)]
+    let functions = Map.fromList $
+                concatMap (\d -> case d of
+                    Func f -> [(name f, f)]
+                    _      -> []) decls
     let models = Map.fromList $
                 concatMap (\d -> case d of
                     Mdl m -> [(modelName m, m)]
@@ -234,6 +237,7 @@ compile decls = do
         doesReturn = False
       },
       counter = 0,
+      functions = functions,
       extends = supers,
       models = models,
       structs = structs,
@@ -444,16 +448,9 @@ compileStatement (For name expr body)
                       restoreScope scope
             _   -> typemismatch (pArray PNothing) dt
          generateEnd
-compileStatement (Expr (Call expr args))
-    = do var <- tmpVar
-         dt <- compileExpression var (pFunction pVoid []) expr
-         case dt of
-            PInterface "Func" (retType:paramTypes)
-                -> do argcodes <- checkargs paramTypes args
-                      lift $ generateCode (var++"("++joinComma argcodes++");\n")
-                      return ()
-            _ -> do typemismatch (pFunction PNothing []) dt
-                    return ()
+compileStatement (Expr (Call name args)) = do
+    (_, code) <- compileCall name args
+    lift $ generateCode (code ++ ";\n")
 compileStatement (Expr expr)
     = do var <- tmpVar
          compileExpression var pVoid expr
@@ -463,6 +460,18 @@ compileStatement (Return expr)
          var <- compileExpressionAs rt expr
          thisPathReturns
          generateReturn var
+
+compileCall name args = do
+    f <- getFunction name
+    case f of
+        Just f' -> do
+            let rt = dt2pdt $ returnType f'
+            let ps = map (dt2pdt.snd) $ parameters f'
+            argcodes <- checkargs ps args
+            return (rt, name++"("++joinComma argcodes++")")
+        Nothing -> do
+            tellError ("function not found: `" ++ name ++ "'")
+            return (PNothing, "NOTHING")
 
 -- Lausekkeiden validaattorit
 
@@ -485,16 +494,10 @@ compileExpression v expdt (Var name)
     = do dt <- getVarOrError name
          generateCreate dt v name
          return dt
-compileExpression v expdt (Call expr args)
-    = do var <- tmpVar
-         dt <- compileExpression var (pFunction PNothing []) expr
-         case dt of
-            PInterface "Func" (retType:paramTypes)
-                -> do argcodes <- checkargs paramTypes args
-                      generateCreate retType v (var++"("++joinComma argcodes++")")
-                      return retType
-            _ -> do typemismatch (pFunction PNothing []) dt
-                    return PNothing
+compileExpression v expdt (Call name args) = do
+    (retType, code) <- compileCall name args
+    generateCreate retType v code
+    return retType
 compileExpression v expdt (List (expr:exprs))
     = do var <- tmpVar
          dt <- compileExpression var PNothing expr -- Käännetään ensimmäisen alkion koodi
@@ -578,6 +581,13 @@ compileExpression v expdt (FieldSet obj field val) = do
         generateAssign fieldcode var3
         generateCreate dt2 v var2
         return dt2
+compileExpression v expdt (Cast dt expr) = do
+    ss <- getCurrentSubs
+    pdt <- substitute ss dt
+    var <- tmpVar
+    vdt <- compileExpression var pdt expr
+    checktype v var pdt vdt
+    return pdt
 compileExpression v expdt (MethodCall obj method args)
     = do var <- tmpVar
          dt <- compileExpression var PNothing obj

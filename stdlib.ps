@@ -184,7 +184,7 @@ extend ArrayList<@T> with List<@T> {
 }
 
 extend ArrayList<@T> with Summable<ArrayList<@T>> {
-	@T operator +(ArrayList<@T> l) {
+	ArrayList<@T> operator +(ArrayList<@T> l) {
 		var arr = new @T[this.size() + l.size()];
 		var i = 0;
 		for (v in this::elements) {
@@ -204,7 +204,7 @@ extend ArrayList<@T> with Summable<ArrayList<@T>> {
 }
 
 extend ArrayList<@T> with Appendable<@T> {
-	Void append(@T value) {
+	ArrayList<@T> append(@T value) {
 		return new ArrayList<@T> { this::elements.append(value) };
 	}
 }

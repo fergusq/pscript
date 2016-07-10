@@ -18,6 +18,7 @@ data TokenClass
 	| TokenOperator
 	| TokenStruct
 	| TokenConst
+	| TokenAs
 	| TokenInt Int
 	| TokenString String
 	| TokenVarname String
@@ -134,4 +135,5 @@ lexVar ln cs =
 		("operator",rest)-> Token ln TokenOperator : lexer ln rest
 		("struct",rest)  -> Token ln TokenStruct : lexer ln rest
 		("const",rest)   -> Token ln TokenConst : lexer ln rest
+		("as",rest)      -> Token ln TokenAs : lexer ln rest
 		(var,rest)       -> Token ln (TokenVarname var) : lexer ln rest

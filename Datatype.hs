@@ -16,7 +16,6 @@ data PDatatype = PInterface String [PDatatype]
 
 pArray a = PInterface "Array" [a]
 pPointer a = PInterface "Pointer" [a]
-pFunction r ps = PInterface "Func" (r:ps)
 pInteger = PInterface "Int" []
 pChar = PInterface "Char" []
 pBool = PInterface "Bool" []
@@ -28,16 +27,10 @@ ifDollar PDollar t           = t
 ifDollar (PInterface n ts) t = PInterface n (map (`ifDollar` t) ts)
 ifDollar PNothing _          = PNothing
 
--- Tekee jokaisesta deklaraatiosta PVariable-olion
-
-decl2pvar :: Function -> PVariable
-decl2pvar f = (name f, pFunction (dt2pdt $ returnType f) (map (dt2pdt . snd) $ parameters f))
-
 -- Muuttaa tietotyypin PDatatype-olioksi
 
 dt2pdt :: Datatype -> PDatatype
 dt2pdt (Typename "Array" [dt]) = pArray $ dt2pdt dt
-dt2pdt (Typename "Func" (dt:dts)) = pFunction (dt2pdt dt) (map dt2pdt dts)
 dt2pdt (Typename "Int" []) = pInteger
 dt2pdt (Typename "Char" []) = pChar
 dt2pdt (Typename "Str" []) = pString
@@ -73,7 +66,7 @@ pdt2str PNothing = "<nothing>"
 
 instance Show PDatatype where
     show (PInterface a []) = a
-    show (PInterface a as) = a ++ "<" ++ joinComma (map pdt2str as) ++ ">"
-    show (PSum dts) = joinChar '&' (sort $ map pdt2str dts)
+    show (PInterface a as) = a ++ "<" ++ joinComma (map show as) ++ ">"
+    show (PSum dts) = joinChar '&' (sort $ map show dts)
     show PDollar = "$"
     show PNothing = "<nothing>"

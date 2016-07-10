@@ -19,6 +19,7 @@ type Subs = Map.Map String PDatatype
 
 data Scope = Scope {
     varscope :: VarScope,
+    functions :: Map.Map String Function,
     extends :: Map.Map String [Extend],
     models :: Map.Map String Model,
     structs :: Map.Map String Struct,
@@ -79,6 +80,11 @@ thisPathReturns :: Compiler ()
 thisPathReturns = do
     scope@Scope { varscope = vs } <- get
     put scope { varscope = vs { doesReturn = True }}
+
+getFunction :: String -> Compiler (Maybe Function)
+getFunction name = do
+    scope <- get
+    return $ Map.lookup name $ functions scope
 
 getSubstitutions :: PDatatype -> Compiler Subs
 getSubstitutions dt@(PInterface n ts) = do

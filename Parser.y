@@ -23,6 +23,7 @@ import Lexer
 	operator	{ Token _ TokenOperator }
 	struct		{ Token _ TokenStruct }
 	const		{ Token _ TokenConst }
+	as		{ Token _ TokenAs }
 	int		{ Token _ (TokenInt $$) }
 	str		{ Token _ (TokenString $$) }
 	var		{ Token _ (TokenVarname $$) }
@@ -164,8 +165,8 @@ Stmt	: Call ';'			{ Expr $1 }
 Stmts	: Stmt Stmts			{ ($1 : $2) }
 	| Stmt				{ [$1] }
 
-Call	: Preprim '(' Args ')'		{ Call $1 $3 }
-	| Preprim '(' ')'		{ Call $1 [] }
+Call	: var '(' Args ')'		{ Call $1 $3 }
+	| var '(' ')'			{ Call $1 [] }
 	| Preprim '[' Exp ']'		{ MethodCall $1 "op_get" [$3] }
 	| Preprim '[' Exp ']' '=' Exp	{ MethodCall $1 "op_set" [$3, $6] }
 	| Preprim '.' var '(' Args ')'	{ MethodCall $1 $3 $5 }
@@ -220,6 +221,7 @@ Prim	: int				{ Int $1 }
 	| new Datatype '{' Args '}'	{ NewStruct $2 $4 }
 	| new Datatype '{' '}'		{ NewStruct $2 [] }
 	| new Datatype '*' '(' Exp ')'	{ NewPtrList $2 $5 }
+	| Preprim as Datatype		{ Cast $3 $1 }
 
 {
 parseError :: [Token] -> a
@@ -283,12 +285,13 @@ data Expression
 	| Var String
 	| List [Expression]
 	| Range Expression Expression
-	| Call Expression [Expression]
+	| Call String [Expression]
 	| NewList Datatype Expression
 	| NewStruct Datatype [Expression]
 	| NewPtrList Datatype Expression
 	| FieldGet Expression String
 	| FieldSet Expression String Expression
+	| Cast Datatype Expression
 	deriving Show
 }
 
