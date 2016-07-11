@@ -56,7 +56,6 @@ import Lexer
 	ge		{ Token _ TokenGe }
 	and		{ Token _ TokenAnd }
 	or		{ Token _ TokenOr }
-	field		{ Token _ TokenField }
 	dotdot		{ Token _ TokenDotDot }
 
 %%
@@ -78,8 +77,8 @@ Model	: model var '{' EFuncs '}'				{ Model $2 [] [] $4 }
 TParams	: '@' var ',' TParams		{ ($2 : $4) }
 	| '@' var			{ [$2] }
 
-Extend	: extend var with Datatype '{' Funcs '}'			{ Extend { dtName = $2, eTypeparameters = [], model = $4, eMethods = $6 } }
-	| extend var '<' TParams '>' with Datatype '{' Funcs '}'	{ Extend { dtName = $2, eTypeparameters = $4, model = $7, eMethods = $9 } }
+Extend	: extend var with Datatype '{' Funcs '}'			{ Extend $2 [] $4 $6 }
+	| extend var '<' TParams '>' with Datatype '{' Funcs '}'	{ Extend $2 $4 $7 $9 }
 
 Funcs	: Func Funcs			{ ($1 : $2) }
 	| Func				{ [$1] }
@@ -230,7 +229,10 @@ parseError ((Token ln t):ts)
 parseError [] = error "Parser error on EOF"
 
 data Declaration =
-	Func Function | Mdl Model | Ext Extend | Stc Struct deriving Show
+	Func Function
+	| Mdl Model
+	| Ext Extend
+	| Stc Struct deriving Show
 
 data Model = Model {
 	modelName :: String,
@@ -264,7 +266,8 @@ data Datatype
 	= Typename String [Datatype]
 	| SumType [Datatype]
 	| Typeparam String
-	| DollarType deriving Show
+	| DollarType
+	deriving Show
 
 data Statement
 	= Create String Expression
