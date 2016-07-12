@@ -220,4 +220,14 @@ Maybe<@T> just<@T>(@T value) {
 	return new Maybe<@T>::Just(value);
 }
 
+extend Maybe<@T> with Container<@T> {
+	Bool contains(@T value) {
+		match (this) {
+			Just(v) -> return v == value;
+			Nothing -> return false;
+		}
+		return false;
+	}
+}
+
 #endif
