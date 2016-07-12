@@ -10,10 +10,10 @@ record TestReport(test_name, status, message) {
 
 function doTest(name, code, eout) {
 	{
-		print("#include \"stdlib.ps\"\nextern Void puts(Str s); Void println(String s) puts(s.toString());")
+		print("#include \"eg/stdlib.ps\"\nextern Void puts(Str s); Void println(String s) puts(s.toString());")
 		print(line) for line in code
 	} | writeLines("tmp.ps")
-	{} | exec("./compile.sh", "tmp.ps") | {}
+	{} | exec("script/compile.sh", "tmp.ps") | {}
 	out := [{}() | exec(:l, "./etmp")]
 	{} | exec("rm", "tmp.ps", "etmp") | {}
 	if [ #out != #eout ] do

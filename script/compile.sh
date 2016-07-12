@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PSFILE="$1"
-NAME="${PSFILE%.*}"
+NAME=`basename "${PSFILE%.*}"`
 CFILE="$NAME".c
 EFILE=e"$NAME"
 
