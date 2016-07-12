@@ -25,6 +25,13 @@ extend Int with String {
 	}
 }
 
+extend Bool with String {
+	Str toString() {
+		if (this) return "true";
+		else return "false";
+	}
+}
+
 extend Array<@T> with String {
 	Str toString() {
 		var str = "[";
