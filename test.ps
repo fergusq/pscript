@@ -117,6 +117,10 @@ Int[] fromTo(Int from, Int to) {
 
 //
 
+@T id<@T>(@T t) { return t; }
+
+//
+
 extend Int with Appendable<Int> {
 	Int append(Int i) {
 		return this + i;
@@ -166,13 +170,12 @@ Void main() {
 	//var boolPrinter = new AddingPrinterImpl<Bool> { true };
 	//boolPrinter.print(true);
 	
-	var yesno = new YesNo::Yes {};
+	var yesno = new YesNo::Yes();
 	match (yesno) {
 		Yes -> "yes".print();
 		No  -> "no".print();
 	}
-	
-	var a = new Maybe<Int>::Just(3);
+	var a = just(id(3));
 	match (a) {
 		Just(i) -> puts("got: " + i);
 		Nothing -> puts("nothing");

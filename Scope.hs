@@ -298,19 +298,22 @@ data FSignature = FSignature {
 
 -- Korvaa tyyppiparametrit tyyppiargumentoilla
 
-substitute :: Subs -> Datatype -> Compiler PDatatype
-substitute subs (Typeparam t) = case Map.lookup t subs of
+substitute' :: Bool -> Subs -> Datatype -> Compiler PDatatype
+substitute' err subs (Typeparam t) = case Map.lookup t subs of
                                     Just dt -> return dt
-                                    _       -> do tellError ("Unknown typeparameter "++t
-                                                          ++ " of " ++ show subs)
+                                    _       -> do when err $ tellError
+                                                                ("Unknown typeparameter "++t
+                                                                ++ " of " ++ show subs)
                                                   return PNothing
-substitute subs (Typename n ts) = do
+substitute' err subs (Typename n ts) = do
     ts' <- (mapM $ substitute subs) ts
     return $ PInterface n ts'
-substitute subs (SumType ts) = do
+substitute' err subs (SumType ts) = do
     ts' <- mapM (substitute subs) ts
     return $ PSum ts'
-substitute subs t = return $ dt2pdt t
+substitute' err subs t = return $ dt2pdt t
+
+substitute = substitute' True
 
 subsFunction :: Subs -> Function -> Compiler FSignature
 subsFunction subs f = do

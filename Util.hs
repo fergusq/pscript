@@ -58,3 +58,10 @@ combinations xs = nub $ map sort $ do n <- [1..length xs]
 isIdentifierChar :: Char -> Bool
 isIdentifierChar '_' = True
 isIdentifierChar c = isAlphaNum c
+
+forxM :: (Monad m) => [a] -> c -> (a -> c -> m (b, c)) -> m ([b], c)
+forxM [] c callback = return ([], c)
+forxM (a:as) c callback = do
+    (b, c') <- callback a c
+    (bs, c'') <- forxM as c' callback
+    return (b:bs, c'')

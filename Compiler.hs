@@ -259,6 +259,14 @@ ensureExtendIsDefined dt@(PInterface _ ts) extend = unless (null $ eTypeparamete
     conditionallyCreateExtend (show dt ++ show (model extend)) $
         queueDecl ss $ Ext extend
 
+-- varmistaa, että tyyppiparametrisoidun funktion haluttu versio generoidaan
+ensureFunctionIsDefined :: [PDatatype] -> Function -> Compiler ()
+ensureFunctionIsDefined ts func = unless (null $ funcTypeparameters func) $ do
+    let ss = Map.fromList $ zip (funcTypeparameters func) ts
+    let n = name func ++ "_" ++ joinChar '_' (map pdt2str ts)
+    conditionallyCreateMethod n $
+        queueDecl ss $ Func func { name = n }
+
 -- Pääfunktio
 
 compile :: [Declaration] -> Generator ()
@@ -333,26 +341,27 @@ compileDecl :: [PVariable] -> (Subs, Declaration)
 compileDecl pvars (ss, Func decl@Function { name = fname, parameters = params,
                                             returnType=rtype, body = Extern })
     = lift $ generateExternFunctionHeader (dt2pdt rtype) [] fname
-compileDecl pvars (ss, Func func) = do
-    scope <- get
-    let fname = name func
-    params <- mapM (\(n,d) -> substitute ss d >>= \d' -> return (n,d')) (parameters func)
-    rtype <- substitute ss $ returnType func
-    let vscope = varscope scope
-    put scope { varscope = vscope {
-        functionName = fname,
-        variables = Map.fromList $ pvars ++ params,
-        expectedReturnType = rtype,
-        subs = ss,
-        doesReturn = False
-    }}
-    lift $ generateFunctionHeader rtype (map snd params) fname
-    generateFunction rtype fname params
-    compileStatement $ body func
-    returns <- doesThisPathReturn
-    when (rtype /= pVoid && not returns) $
-        tellError "function does not return a value"
-    generateEnd
+compileDecl pvars (ss, Func func) =
+    when (null (funcTypeparameters func) || not (null ss)) $ do
+        scope <- get
+        let fname = name func
+        params <- mapM (\(n,d) -> substitute ss d >>= \d' -> return (n,d')) (parameters func)
+        rtype <- substitute ss $ returnType func
+        let vscope = varscope scope
+        put scope { varscope = vscope {
+            functionName = fname,
+            variables = Map.fromList $ pvars ++ params,
+            expectedReturnType = rtype,
+            subs = ss,
+            doesReturn = False
+        }}
+        lift $ generateFunctionHeader rtype (map snd params) fname
+        generateFunction rtype fname params
+        compileStatement $ body func
+        returns <- doesThisPathReturn
+        when (rtype /= pVoid && not returns) $
+            tellError "function does not return a value"
+        generateEnd
 compileDecl _ (ss, Mdl m) =
     when (null $ typeparameters m) $ do
         let mname = modelName m
@@ -378,6 +387,9 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                        "does not satisfy the interface: there should be " ++
                        show (length ms) ++ " methods, not " ++ show (length fs))
         forM_ fs (\f -> do
+            unless (null $ funcTypeparameters f) $
+                tellError ("methods must not have typeparameters, but "
+                           ++ name f ++ " has")
             mf' <- getModelMethod dt (name f)
             case mf' of
                 Nothing -> tellError ("invalid extension of " ++ show edt ++ " with method "
@@ -541,7 +553,7 @@ compileStatement (For name expr body)
                           restoreScope scope
                 _   -> typemismatch (pArray PNothing) dt
 compileStatement (Expr (Call name args)) = do
-    (_, code) <- compileCall name args
+    (_, code) <- compileCall pVoid name args
     lift $ generateCode (code ++ ";\n")
 compileStatement (Expr expr)
     = do (var, dt) <- compileExpression pVoid expr
@@ -595,17 +607,72 @@ compileMatchCase var dt mcond@(MatchCond caseName fieldMatches) = do
                 -- jos ei matchata enumia vastaan, muuttuja on ainoa mahdollinen match
                 return ("1", [(caseName, dt, var)])
 
-compileCall name args = do
-    f <- getFunction name
-    case f of
-        Just f' -> do
-            let rt = dt2pdt $ returnType f'
-            let ps = map (dt2pdt.snd) $ parameters f'
-            argcodes <- checkargs ps args
-            return (rt, name++"("++joinComma argcodes++")")
+compileCall expdt name args = do
+    f' <- getFunction name
+    case f' of
+        Just f -> let tps = funcTypeparameters f
+            in if null tps
+            then do
+                -- käännetään tyyppiparametrisoimaton funktio
+                let rt = dt2pdt $ returnType f
+                let ps = map (dt2pdt.snd) $ parameters f
+                argcodes <- checkargs ps args
+                return (rt, name++"("++joinComma argcodes++")")
+            else do
+                -- alustava inferointi odotetun tyypin perusteella
+                let rt' = returnType f
+                rtss <- Map.fromList <$> matchTypeArguments rt' expdt
+
+                -- käännetään argumentit ja inferoidaan samalla
+                let ps' = map snd $ parameters f
+                (acts, ss) <- forxM (zip ps' args) rtss $
+                    \(par', arg) ss -> do
+                            pt <- substitute' False ss par'
+                            (acode, atype) <- compileExpression pt arg
+                            ss' <- Map.fromList <$>
+                                matchTypeArguments par' atype
+                            return ((acode, atype), ss `Map.union` ss')
+
+                -- selvitetään lopulliset tyypit inferoinnin perusteella
+                rt <- substitute ss rt'
+                ps <- mapM (substitute ss) ps'
+
+                -- tehdään argumenttien vaatimat tyyppimuunnokset
+                argcodes <- forM (zip ps acts) $ uncurry $ \pt (argcode', argtype') -> do
+                    var <- tmpVar
+                    argv <- createTmpVarIfNeeded argtype' argcode'
+                    checktype var argv pt argtype'
+                    return var
+
+                -- muodostetaan lista inferoiduista tyyppiargumenteista
+                tas <- forM tps $ \tp ->
+                    case Map.lookup tp ss of
+                        Nothing -> do
+                            tellError ("can't infer value of @" ++ tp)
+                            return PNothing
+                        Just PNothing -> do
+                            tellError ("can't infer value of @" ++ tp)
+                            return PNothing
+                        Just t ->
+                            return t
+
+                -- varmistetaan, että oikea versio funktiosta luodaan
+                ensureFunctionIsDefined tas f
+
+                return (rt, name++"_"++joinChar '_' (map pdt2str tas)
+                        ++"("++joinComma argcodes++")")
         Nothing -> do
             tellError ("function not found: `" ++ name ++ "'")
             return (PNothing, "NOTHING")
+
+matchTypeArguments :: Datatype -> PDatatype -> Compiler [(String, PDatatype)]
+matchTypeArguments par@(Typename pname pts) arg@(PInterface aname ats) =
+    if pname == aname
+        then concat <$> forM (zip pts ats) (uncurry matchTypeArguments)
+        else return []
+matchTypeArguments _ PNothing = return []
+matchTypeArguments par@(Typeparam pname) arg = return [(pname, arg)]
+matchTypeArguments _ _ = return []
 
 -- Lausekkeiden kääntäjät
 
@@ -631,7 +698,7 @@ compileExpression expdt (Var name)
     = do dt <- getVarOrError name
          return (name, dt)
 compileExpression expdt (Call name args) = do
-    (retType, code) <- compileCall name args
+    (retType, code) <- compileCall expdt name args
     return (code, retType)
 compileExpression expdt (List (expr:exprs)) = do
     var <- tmpVar

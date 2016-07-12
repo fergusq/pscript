@@ -30,6 +30,17 @@ function doTest(name, code, eout) {
 	return new TestReport(name, TRUE, "OK")
 }
 
+function colorify(cond, text) {
+	push(if [ cond ]
+	do [ "\x1b[1;31m" ]
+	else [ "\x1b[1;32m" ]
+	done .. text .. "\x1b[0m")
+}
+
+function inColor(color, text) {
+	push("\x1b["..color.."m" .. text .. "\x1b[0m")
+}
+
 function main(testfile) {
 	results := []
 	i := 1
@@ -50,24 +61,32 @@ function main(testfile) {
 			done
 			push("Compiling test "..i.." ("..name..")... ")
 			result := doTest(name, code, eout)
-			print("["..if[result.status]do["OK"];else["FAILED"]done.."]")
+			print("["..if[result.status]do["OK"];else[inColor("1;31", "FAILED")]done.."]")
 			results += result
 			i ++
 		else
 			error("syntax error: `" .. line .. "'") unless [ line =~ "\\s*" ]
 		done
 	done
+	print(inColor("1;30", "---"))
 	i := 1
 	succs := 0
 	fails := 0
+	failtexts := []
 	for test in results do
 		if [ test.status ] do
 			succs ++
 		else
-			print("Test "..i.." FAILED ("..test.test_name.."): "..test.message)
+			failtexts += "  Test "..i.." ("..test.test_name.."): "..test.message
 			fails ++
 		done
 		i ++
 	done
-	print("PASSED TESTS: "..succs.." FAILURES: "..fails.." RATE: " .. succs/#results*100//1 .. " %")
+	if [ fails > 0 ] do
+		print(inColor("1", "Some tests failed:"))
+		print(fail) for fail in failtexts
+		print(inColor("1;30", "---"))
+	done
+	print(inColor("1", "PASSED TESTS: ")..succs..inColor("1", " FAILURES: ")..fails..
+		inColor("1", " RATE: ") .. colorify(fails > 0, succs/#results*100//1 .. " %"))
 }

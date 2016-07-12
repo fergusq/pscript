@@ -216,4 +216,8 @@ enum Maybe<@T> {
 	Nothing
 }
 
+Maybe<@T> just<@T>(@T value) {
+	return new Maybe<@T>::Just(value);
+}
+
 #endif

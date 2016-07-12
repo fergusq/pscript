@@ -93,3 +93,23 @@ Void main() {
 got: 3
 nothing
 ---
+### Function type parameters
+@T id<@T>(@T t) { return t; }
+Void main() {
+	var a = id(11);
+	var b = id(22);
+	println(a+b);
+}
+==>
+33
+---
+### Function type parameters v2
+@T id<@T>(@T t) { return t; }
+Void main() {
+	var a = id(id(99));
+	var b = id(88);
+	println(id(a+b));
+}
+==>
+187
+---

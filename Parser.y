@@ -90,16 +90,18 @@ Funcs	: Func Funcs			{ ($1 : $2) }
 EFuncs	: ExternFunc EFuncs		{ ($1 : $2) }
 	| ExternFunc			{ [$1] }
 
-Func	: Datatype var '(' Params ')' Stmt	{ Function { name = $2, parameters = $4, returnType = $1, body = $6 } }
-	| Datatype var '(' ')' Stmt		{ Function { name = $2, parameters = [], returnType = $1, body = $5 } }
-	| Datatype operator Op1 '(' Parameter ')' Stmt	{ Function { name = $3, parameters = [$5], returnType = $1, body = $7 } }
-	| Datatype operator Op2 '(' Parameter ',' Parameter ')' Stmt	{ Function $3 [$5, $7] $1 $9 }
+Func	: Datatype var '(' Params ')' Stmt				{ Function $2 [] $4 $1 $6 }
+	| Datatype var '(' ')' Stmt					{ Function $2 [] [] $1 $5 }
+	| Datatype var '<' TParams '>' '(' Params ')' Stmt		{ Function $2 $4 $7 $1 $9 }
+	| Datatype var '<' TParams '>' '(' ')' Stmt			{ Function $2 $4 [] $1 $8 }
+	| Datatype operator Op1 '(' Parameter ')' Stmt			{ Function $3 [] [$5] $1 $7 }
+	| Datatype operator Op2 '(' Parameter ',' Parameter ')' Stmt	{ Function $3 [] [$5, $7] $1 $9 }
 
 ExternFunc
-	: Datatype var '(' Params ')' ';'	{ Function { name = $2, parameters = $4, returnType = $1, body = Extern } }
-	| Datatype var '(' ')' ';'		{ Function { name = $2, parameters = [], returnType = $1, body = Extern } }
-	| Datatype operator Op1 '(' Parameter ')' ';'	{ Function { name = $3, parameters = [$5], returnType = $1, body = Extern } }
-	| Datatype operator Op2 '(' Parameter ',' Parameter ')' ';'	{ Function $3 [$5, $7] $1 Extern }
+	: Datatype var '(' Params ')' ';'				{ Function $2 [] $4 $1 Extern }
+	| Datatype var '(' ')' ';'					{ Function $2 [] [] $1 Extern }
+	| Datatype operator Op1 '(' Parameter ')' ';'			{ Function $3 [] [$5] $1 Extern }
+	| Datatype operator Op2 '(' Parameter ',' Parameter ')' ';'	{ Function $3 [] [$5, $7] $1 Extern }
 
 Op1	: '|'				{ "op_pipe" }
 	| '[' ']'			{ "op_get" }
@@ -294,6 +296,7 @@ data EnumStruct = EnumStruct {
 
 data Function = Function {
 	name :: String,
+	funcTypeparameters :: [String],
 	parameters :: [(String,Datatype)],
 	returnType :: Datatype,
 	body :: Statement
