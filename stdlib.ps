@@ -102,7 +102,7 @@ model Appendable<@T> {
 extend Array<@T> with Appendable<@T> {
 	@T[] append(@T item) {
 		var newArray = new @T[this.len+1];
-		for (i in fromTo(0, this.len-1)) {
+		for (i in [0 .. this.len-1]) {
 			newArray[i] = this[i];
 		}
 		newArray[this.len] = item;
@@ -209,16 +209,11 @@ extend ArrayList<@T> with Appendable<@T> {
 	}
 }
 
-// FROMTO
+// MAYBE
 
-Int[] fromTo(Int from, Int to) {
-	var array = new Int[to-from+1];
-	var i = 0;
-	for (value in array) {
-		array[i] = from+i;
-		i = i + 1;
-	}
-	return array;
+enum Maybe<@T> {
+	Just(@T),
+	Nothing
 }
 
 #endif

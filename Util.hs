@@ -18,6 +18,7 @@ import Control.Monad
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.List
+import Data.Char
 
 joinChar :: Char -> [String] -> String
 joinChar _ [] = ""
@@ -53,3 +54,7 @@ combinations xs = nub $ map sort $ do n <- [1..length xs]
                                       if null sublist
                                        then []
                                        else sublist:combinations sublist
+
+isIdentifierChar :: Char -> Bool
+isIdentifierChar '_' = True
+isIdentifierChar c = isAlphaNum c

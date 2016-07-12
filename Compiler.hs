@@ -4,6 +4,7 @@ import qualified Data.Map as Map
 import Control.Monad.Writer
 import Control.Monad.State
 import Data.Maybe
+import Data.Char
 import System.IO
 import Parser
 import Lexer
@@ -178,6 +179,17 @@ checkargs paramTs args = if length paramTs /= length args
                                     return []
                             else forM (zip paramTs args)
                                   (\(t,v) -> compileExpressionAs t v)
+
+-- luo tarvittaessa uuden väliaikaismuuttujan, jotta sivuvaikutuksellist arvoa ei
+-- suoritettaisi kahdesti
+createTmpVarIfNeeded :: PDatatype -> String -> Compiler String
+createTmpVarIfNeeded dt cexpr =
+    if all isIdentifierChar cexpr then
+        return cexpr
+    else do
+        var <- tmpVar
+        generateCreate dt var cexpr
+        return var
 
 -- varmistaa, että tyypin vaatimat C-structit ja funktiot on luotu
 ensureStructIsDefined :: PDatatype -> Compiler ()
@@ -405,7 +417,7 @@ compileDecl _ (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
         let dt = PInterface n etas
         lift $ generateSuperHeaderCode ("enum e_" ++ pdt2str dt ++ " {\n")
         forM_ cs $ \(cname, _) ->
-            lift $ generateSuperHeaderCode ("\t" ++ cname ++ ",\n")
+            lift $ generateSuperHeaderCode ("\t" ++ pdt2str dt ++ "_" ++ cname ++ ",\n")
         lift $ generateSuperHeaderCode "};\n"
         lift $ generateSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++ " "
                                         ++ pdt2str dt ++ ";\n")
@@ -543,8 +555,7 @@ compileStatement (Return expr)
          generateReturn var
 compileStatement (Match expr cases) = do
     (exprv', dt) <- compileExpression PNothing expr
-    exprv <- tmpVar
-    generateCreate dt exprv exprv'
+    exprv <- createTmpVarIfNeeded dt exprv'
     forM_ (zip [1..] cases) $ \(i, (mcond, body)) -> do
         (cond, assigns) <- compileMatchCase exprv dt mcond
         (if i == 1 then generateIf else generateElseIf) cond $ do
@@ -565,19 +576,24 @@ compileMatchCase var dt mcond@(MatchCond caseName fieldMatches) = do
         Just cs ->
             case lookup caseName cs of
                 Just fs -> do
-                    let cond = var++"._type=="++caseName
+                    let cond = var++"._type=="++pdt2str dt++"_"++caseName
                     let fsWithNames = zip (map (\i->"_k"++show i) [1..]) fs
                     (conds, assigns) <- foldr (\(a, b) (as,bs) -> (a++"&&"++as,b:bs)) ("1",[])
                         <$> forM (zip fsWithNames fieldMatches)
-                            (\((n,dt), fm) -> compileMatchCase n dt fm)
+                            (\((n,dt), fm) ->
+                                compileMatchCase (var++"."++caseName++"."++n) dt fm)
                     return (cond++"&&"++conds, concat assigns)
                 Nothing ->
                     -- jos ei matchata casea vastaan, kyseessä on muuttuja, johon
                     -- vain sijoitetaan arvo
                     return ("1", [(caseName, dt, var)])
-        Nothing -> do
-            tellError ("attempted to match a non-enum type " ++ show dt)
-            return ("NOTHING", [])
+        Nothing ->
+            if not (null fieldMatches) then do
+                tellError ("attempted to match a non-enum type " ++ show dt)
+                return ("NOTHING", [])
+            else
+                -- jos ei matchata enumia vastaan, muuttuja on ainoa mahdollinen match
+                return ("1", [(caseName, dt, var)])
 
 compileCall name args = do
     f <- getFunction name
@@ -632,7 +648,8 @@ compileExpression expdt (List (expr:exprs)) = do
     return (var, pArray dt)
 compileExpression expdt (Range from to) = do
     var <- tmpVar
-    fromv <- compileExpressionAs pInteger from
+    fromv' <- compileExpressionAs pInteger from
+    fromv <- createTmpVarIfNeeded pInteger fromv'
     tov <- compileExpressionAs pInteger to
     sizev <- tmpVar
     generateCreate pInteger sizev (tov ++ "-" ++ fromv ++ "+1")
@@ -651,8 +668,7 @@ compileExpression expdt (NewList dt size) = do
     ss <- getCurrentSubs
     pdt <- substitute ss dt
     sizev' <- compileExpressionAs pInteger size
-    sizev <- tmpVar
-    generateCreate pInteger sizev sizev'
+    sizev <- createTmpVarIfNeeded pInteger sizev'
     generateCreate (pArray pdt) var ('{': sizev ++ ", alloc("
                                      ++ sizev
                                      ++ "*sizeof(" ++ ctype pdt "" ++ "))}")
@@ -660,16 +676,16 @@ compileExpression expdt (NewList dt size) = do
 compileExpression expdt (NewStruct dt fieldValues) = do
     ss <- getCurrentSubs
     pdt <- substitute ss dt
-    fs <- getFields pdt
-    case fs of
-        Just fs' -> do
+    fs' <- getFields pdt
+    case fs' of
+        Just fs -> do
             var <- tmpVar
-            fieldvaluecodes <- checkargs (map snd fs') fieldValues
+            fieldvaluecodes <- checkargs (map snd fs) fieldValues
             (Just cons) <- isConstant pdt
             if not cons
              then do
                 generateCreate pdt var ("alloc(sizeof(struct _"++pdt2str pdt ++ "))")
-                forM_ (zip fs' fieldvaluecodes) $ \((n, _), c) ->
+                forM_ (zip fs fieldvaluecodes) $ \((n, _), c) ->
                     generateAssign (var++"->"++n) c
              else
                 generateCreate pdt var ("{" ++ joinComma fieldvaluecodes ++ "}")
@@ -689,6 +705,7 @@ compileExpression expdt (NewEnumStruct dt caseName fieldValues) = do
                     var <- tmpVar
                     fieldvaluecodes <- checkargs fs fieldValues
                     generateVarDecl pdt var
+                    generateAssign (var++"._type") (pdt2str pdt ++ "_" ++ caseName)
                     forM_ (zip [1..] fieldvaluecodes) $ \(i, c) ->
                         generateAssign (var++"."++caseName++"._k"++show i) c
                     return (var, pdt)
@@ -715,9 +732,8 @@ compileExpression expdt (FieldGet obj field) = do
 compileExpression expdt (FieldSet obj field val) = do
     (var, dt) <- compileExpression PNothing obj
     ifFieldExists dt field ("NOTHING", PNothing) $ \t -> do
-        valv <- tmpVar
         (valcode, dt2) <- compileExpression dt val
-        generateCreate dt2 valv valcode
+        valv <- createTmpVarIfNeeded dt2 valcode
         var3 <- tmpVar
         checktype var3 valv t dt2
         fieldcode <- structField dt var field
@@ -792,8 +808,7 @@ compileMethodCall obj (PInterface "Array" [dt]) method args
              return (obj ++ ".ptr["++index++"]", dt)
     | method == "op_set"
         = do (index:value:vars) <- checkargs [pInteger, dt] args
-             v <- tmpVar
-             generateCreate dt v value
+             v <- createTmpVarIfNeeded dt value
              generateAssign (obj ++ ".ptr["++index++"]") v
              return (v, dt)
 
@@ -805,8 +820,7 @@ compileMethodCall obj (PInterface "Pointer" [dt]) method args
              return (obj ++ "["++index++"]", dt)
     | method == "op_set"
         = do (index:value:vars) <- checkargs [pInteger, dt] args
-             v <- tmpVar
-             generateCreate dt v value
+             v <- createTmpVarIfNeeded dt value
              generateAssign (obj ++ "["++index++"]") v
              tellWarning "pointer arithmetic is not typesafe"
              return (v, dt)
@@ -821,26 +835,24 @@ compileMethodCall obj dt@(PSum dts) method args
                 tellError ("type " ++ show dt ++ " does not have method `" ++ method ++ "'")
                 return ("NOTHING", PNothing)
             Just (dt', m') -> do
-                objv <- tmpVar
-                generateCreate dt objv obj
+                objv <- createTmpVarIfNeeded dt obj
                 compileMethodCall' m' (objv++"->"++method) objv dt args
 compileMethodCall obj dt method args
-    = do m <- getDTypeMethod dt method
-         case m of
+    = do m' <- getDTypeMethod dt method
+         case m' of
             Nothing -> do
-                p <- getModelMethod dt method
-                case p of
+                p' <- getModelMethod dt method
+                case p' of
                   Nothing -> do
                     tellError ("type " ++ show dt ++
                                " does not have method `" ++ method ++ "'")
                     return ("NOTHING", PNothing)
-                  Just p' -> do
-                    objv <- tmpVar
-                    generateCreate dt objv obj
-                    compileMethodCall' p' (objv++"->"++method) objv dt args
-            Just (e, m') -> do
+                  Just p -> do
+                    objv <- createTmpVarIfNeeded dt obj
+                    compileMethodCall' p (objv++"->"++method) objv dt args
+            Just (e, m) -> do
                 ensureExtendIsDefined dt e
-                compileMethodCall' m' ('_':pdt2str dt++'_':method) obj dt args
+                compileMethodCall' m ('_':pdt2str dt++'_':method) obj dt args
 
 compileMethodCall' f n obj dt args = do
     let r = sreturnType f `ifDollar` dt

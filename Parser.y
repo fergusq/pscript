@@ -138,11 +138,11 @@ Fields	: Parameter ';' Fields		{ ($1 : $3) }
 Enum	: enum var '{' CaseList '}'			{ EnumStruct $2 [] $4 }
 	| enum var '<' TParams '>' '{' CaseList '}'	{ EnumStruct $2 $4 $7 }
 
-CaseList: EnumCase CaseList		{ ($1 : $2) }
+CaseList: EnumCase ',' CaseList		{ ($1 : $3) }
 	| EnumCase			{ [$1] }
 
-EnumCase: var ';'			{ ($1, []) }
-	| var '(' DtList ')' ';'	{ ($1, $3) }
+EnumCase: var				{ ($1, []) }
+	| var '(' DtList ')'		{ ($1, $3) }
 
 Datatype: PrimDT			{ $1 }
 	| '$'				{ DollarType }
@@ -246,8 +246,8 @@ Prim	: int					{ Int $1 }
 	| new Datatype '[' Exp ']'		{ NewList $2 $4 }
 	| new Datatype '{' Args '}'		{ NewStruct $2 $4 }
 	| new Datatype '{' '}'			{ NewStruct $2 [] }
-	| new Datatype field var '{' Args '}'	{ NewEnumStruct $2 $4 $6 }
-	| new Datatype field var '{' '}'	{ NewEnumStruct $2 $4 [] }
+	| new Datatype field var '(' Args ')'	{ NewEnumStruct $2 $4 $6 }
+	| new Datatype field var '(' ')'	{ NewEnumStruct $2 $4 [] }
 	| new Datatype '*' '(' Exp ')'		{ NewPtrList $2 $5 }
 	| Preprim as Datatype			{ Cast $3 $1 }
 

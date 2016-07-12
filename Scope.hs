@@ -101,8 +101,14 @@ getSubstitutions dt@(PInterface n ts) = do
                 Just struct ->
                     let tps = stcTypeparameters struct
                     in return $ Map.fromList (zip tps ts)
-                Nothing ->
-                    return Map.empty
+                Nothing -> do
+                    let e = enums scope
+                    case Map.lookup n e of
+                        Just enum ->
+                            let tps = enmTypeparameters enum
+                            in return $ Map.fromList (zip tps ts)
+                        Nothing ->
+                            return Map.empty
 
 getCurrentSubs :: Compiler Subs
 getCurrentSubs = do
@@ -224,6 +230,12 @@ getCases dt@(PInterface n _) = do
                 return (n, ts')
             return $ Just a
         Nothing -> return Nothing
+
+getCases PNothing = return Nothing
+
+getCases dt = do
+    tellError $ show dt ++ " does not have enum cases"
+    return Nothing
 
 nextNum :: Compiler Int
 nextNum = do scope <- get

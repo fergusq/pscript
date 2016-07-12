@@ -99,8 +99,20 @@ extend AddingPrinterImpl<@T> with AddingPrinter<@T> {
 //
 
 enum YesNo {
-	Yes;
-	No;
+	Yes,
+	No
+}
+
+//
+
+Int[] fromTo(Int from, Int to) {
+	var array = new Int[to-from+1];
+	var i = 0;
+	for (value in array) {
+		array[i] = from+i;
+		i = i + 1;
+	}
+	return array;
 }
 
 //
@@ -158,6 +170,17 @@ Void main() {
 	match (yesno) {
 		Yes -> "yes".print();
 		No  -> "no".print();
+	}
+	
+	var a = new Maybe<Int>::Just(3);
+	match (a) {
+		Just(i) -> puts("got: " + i);
+		Nothing -> puts("nothing");
+	}
+	var b = new Maybe<Int>::Nothing();
+	match (b) {
+		Just(i) -> puts("got: " + i);
+		Nothing -> puts("nothing");
 	}
 }
 
