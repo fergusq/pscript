@@ -4,8 +4,6 @@ extern Void puts(Str s);
 
 Void printInt(Int i) { printf("%d\n", i); }
 
-#include "stdlib.ps"
-
 // Printable model
 
 model Printable {
@@ -100,6 +98,13 @@ extend AddingPrinterImpl<@T> with AddingPrinter<@T> {
 
 //
 
+enum YesNo {
+	Yes;
+	No;
+}
+
+//
+
 extend Int with Appendable<Int> {
 	Int append(Int i) {
 		return this + i;
@@ -148,4 +153,12 @@ Void main() {
 	
 	//var boolPrinter = new AddingPrinterImpl<Bool> { true };
 	//boolPrinter.print(true);
+	
+	var yesno = new YesNo::Yes {};
+	match (yesno) {
+		Yes -> "yes".print();
+		No  -> "no".print();
+	}
 }
+
+#include "stdlib.ps"

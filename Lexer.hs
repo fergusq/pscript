@@ -17,8 +17,10 @@ data TokenClass
 	| TokenNew
 	| TokenOperator
 	| TokenStruct
+	| TokenEnum
 	| TokenConst
 	| TokenAs
+	| TokenMatch
 	| TokenSub
 	| TokenSuper
 	| TokenInt Int
@@ -140,4 +142,6 @@ lexVar ln cs =
 		("as",rest)      -> Token ln TokenAs : lexer ln rest
 		("sub",rest)     -> Token ln TokenSub : lexer ln rest
 		("super",rest)   -> Token ln TokenSuper : lexer ln rest
+		("enum",rest)   -> Token ln TokenEnum : lexer ln rest
+		("match",rest)   -> Token ln TokenMatch : lexer ln rest
 		(var,rest)       -> Token ln (TokenVarname var) : lexer ln rest

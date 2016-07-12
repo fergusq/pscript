@@ -22,8 +22,10 @@ import Lexer
 	new		{ Token _ TokenNew }
 	operator	{ Token _ TokenOperator }
 	struct		{ Token _ TokenStruct }
+	enum		{ Token _ TokenEnum }
 	const		{ Token _ TokenConst }
 	as		{ Token _ TokenAs }
+	match		{ Token _ TokenMatch }
 	int		{ Token _ (TokenInt $$) }
 	str		{ Token _ (TokenString $$) }
 	var		{ Token _ (TokenVarname $$) }
@@ -57,6 +59,7 @@ import Lexer
 	and		{ Token _ TokenAnd }
 	or		{ Token _ TokenOr }
 	dotdot		{ Token _ TokenDotDot }
+	field		{ Token _ TokenField }
 
 %%
 
@@ -68,6 +71,7 @@ Decl	: Func				{ Func $1 }
 	| Model				{ Mdl $1 }
 	| Extend			{ Ext $1 }
 	| Struct			{ Stc $1 }
+	| Enum				{ Enm $1 }
 
 Model	: model var '{' EFuncs '}'				{ Model $2 [] [] $4 }
 	| model var '<' TParams '>' '{' EFuncs '}' 		{ Model $2 $4 [] $7 }
@@ -131,6 +135,15 @@ Struct	: struct var '{' Fields '}'			{ Struct $2 [] $4 False }
 Fields	: Parameter ';' Fields		{ ($1 : $3) }
 	| Parameter ';'			{ [$1] }
 
+Enum	: enum var '{' CaseList '}'			{ EnumStruct $2 [] $4 }
+	| enum var '<' TParams '>' '{' CaseList '}'	{ EnumStruct $2 $4 $7 }
+
+CaseList: EnumCase CaseList		{ ($1 : $2) }
+	| EnumCase			{ [$1] }
+
+EnumCase: var ';'			{ ($1, []) }
+	| var '(' DtList ')' ';'	{ ($1, $3) }
+
 Datatype: PrimDT			{ $1 }
 	| '$'				{ DollarType }
 	| '@' var			{ Typeparam $2 }
@@ -160,6 +173,20 @@ Stmt	: Call ';'			{ Expr $1 }
 	| return Exp ';'		{ Return $2 }
 	| '{' Stmts '}'			{ Block $2 }
 	| Preprim '|' Pipe ';'		{ Expr $ MethodCall $1 "op_pipe" [$3] }
+	| match '(' Exp ')' '{' Matches '}'	{ Match $3 $6 }
+	| match '(' Exp ')' '{' '}'	{ Match $3 [] }
+
+Matches	: MatchCase Matches		{ ($1 : $2) }
+	| MatchCase			{ [$1] }
+
+MatchCase: MatchCond arrow Stmt		{ ($1, $3) }
+MatchCond
+	: var				{ MatchCond $1 [] }
+	| var '(' MatchConds ')'	{ MatchCond $1 $3 }
+
+MatchConds
+	: MatchCond ',' MatchConds	{ ($1 : $3) }
+	| MatchCond			{ [$1] }
 
 Stmts	: Stmt Stmts			{ ($1 : $2) }
 	| Stmt				{ [$1] }
@@ -210,17 +237,19 @@ Pipe	: Pipe '|' Preprim		{ MethodCall $1 "op_pipe" [$3] }
 Preprim	: Call				{ $1 }
 	| Prim				{ $1 }
 
-Prim	: int				{ Int $1 }
-	| str				{ Str $1 }
-	| var				{ Var $1 }
-	| '(' Exp ')'			{ $2 }
-	| '[' Args ']'			{ List $2 }
-	| '[' Exp dotdot Exp ']'	{ Range $2 $4 }
-	| new Datatype '[' Exp ']'	{ NewList $2 $4 }
-	| new Datatype '{' Args '}'	{ NewStruct $2 $4 }
-	| new Datatype '{' '}'		{ NewStruct $2 [] }
-	| new Datatype '*' '(' Exp ')'	{ NewPtrList $2 $5 }
-	| Preprim as Datatype		{ Cast $3 $1 }
+Prim	: int					{ Int $1 }
+	| str					{ Str $1 }
+	| var					{ Var $1 }
+	| '(' Exp ')'				{ $2 }
+	| '[' Args ']'				{ List $2 }
+	| '[' Exp dotdot Exp ']'		{ Range $2 $4 }
+	| new Datatype '[' Exp ']'		{ NewList $2 $4 }
+	| new Datatype '{' Args '}'		{ NewStruct $2 $4 }
+	| new Datatype '{' '}'			{ NewStruct $2 [] }
+	| new Datatype field var '{' Args '}'	{ NewEnumStruct $2 $4 $6 }
+	| new Datatype field var '{' '}'	{ NewEnumStruct $2 $4 [] }
+	| new Datatype '*' '(' Exp ')'		{ NewPtrList $2 $5 }
+	| Preprim as Datatype			{ Cast $3 $1 }
 
 {
 parseError :: [Token] -> a
@@ -232,7 +261,9 @@ data Declaration =
 	Func Function
 	| Mdl Model
 	| Ext Extend
-	| Stc Struct deriving Show
+	| Stc Struct
+	| Enm EnumStruct
+	deriving Show
 
 data Model = Model {
 	modelName :: String,
@@ -253,6 +284,12 @@ data Struct = Struct {
 	stcTypeparameters :: [String],
 	stcFields :: [(String, Datatype)],
 	isConst :: Bool
+} deriving Show
+
+data EnumStruct = EnumStruct {
+	enmName :: String,
+	enmTypeparameters :: [String],
+	enmCases :: [(String, [Datatype])]
 } deriving Show
 
 data Function = Function {
@@ -278,7 +315,12 @@ data Statement
 	| If Expression Statement (Maybe Statement)
 	| While Expression Statement
 	| Return Expression
+	| Match Expression [(MatchCondition, Statement)]
 	| Extern
+	deriving Show
+
+data MatchCondition
+	= MatchCond String [MatchCondition]
 	deriving Show
 
 data Expression
@@ -291,6 +333,7 @@ data Expression
 	| Call String [Expression]
 	| NewList Datatype Expression
 	| NewStruct Datatype [Expression]
+	| NewEnumStruct Datatype String [Expression]
 	| NewPtrList Datatype Expression
 	| FieldGet Expression String
 	| FieldSet Expression String Expression

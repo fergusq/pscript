@@ -21,37 +21,48 @@ generateFunction rtype name params
 
 generateIf :: String -> Compiler () -> Compiler ()
 generateIf cond callback = do
-    lift $ tell ["    if(", cond, "){\n"]
+    lift $ tell ["\tif(", cond, "){\n"]
+    callback
+    generateEnd
+
+generateElseIf :: String -> Compiler () -> Compiler ()
+generateElseIf cond callback = do
+    lift $ tell ["\telse if(", cond, "){\n"]
     callback
     generateEnd
 
 generateWhile :: String -> Compiler () -> Compiler ()
 generateWhile cond callback = do
-    lift $ tell ["    while(", cond, "){\n"]
+    lift $ tell ["\twhile(", cond, "){\n"]
     callback
     generateEnd
 
 generateElse :: Compiler  ()
 generateElse
-    = lift $ tell ["    }else{\n"]
+    = lift $ tell ["\t}else{\n"]
 
 generateEnd :: Compiler ()
 generateEnd
-    = lift $ tell ["    }\n"]
+    = lift $ tell ["\t}\n"]
 
 generateCreate :: PDatatype -> String -> String -> Compiler ()
 generateCreate dt var value
-    = do lift $ tell ["    ", ctype dt var,"=",value,";\n"]
+    = do lift $ tell ["\t", ctype dt var,"=",value,";\n"]
          ensureStructIsDefined dt -- varmistetaan, että kaikki tyypin käsittelemiseen
                                   -- tarvittavat c-tietorakenteet ja funktiot on generoitu
 
+generateVarDecl :: PDatatype -> String -> Compiler ()
+generateVarDecl dt var
+    = do lift $ tell ["\t", ctype dt var,";\n"]
+         ensureStructIsDefined dt
+
 generateAssign :: String -> String -> Compiler ()
 generateAssign var value
-    = tell ["    ",var,"=",value,";\n"]
+    = tell ["\t",var,"=",value,";\n"]
 
 generateReturn :: String -> Compiler ()
 generateReturn value
-    = tell ["    return ", value, ";\n"]
+    = tell ["\treturn ", value, ";\n"]
 
 generateCode :: String -> Generator ()
 generateCode code
@@ -194,13 +205,9 @@ ensureStructIsDefined dt =
                     methods <- getModelMethods dt
                     compileStruct dt n methods
             -- jos tyyppi on struct, luodaan sille oma C-struct
-            let s = Map.lookup t $ structs scope
-            case s of
-                Just s' ->
-                    conditionallyCreateStruct n $ do
-                        ss <- getSubstitutions dt
-                        queueDecl ss (Stc s')
-                _ -> return ()
+            queueDeclConditionallyIfInList structs Stc scope n t dt
+            -- jos tyyppi on enum, luodaan sille oma C-struct
+            queueDeclConditionallyIfInList enums Enm scope n t dt
         -- intersektiotyypin struct on samanlainen kuin malliolion, mutta sen
         -- vtable sisältää kaikkien mallien metodit
         dt@(PSum dts) -> do
@@ -209,6 +216,15 @@ ensureStructIsDefined dt =
                 methods <- concat <$> mapM getModelMethods dts
                 compileStruct dt n methods
         _   -> return ()
+
+queueDeclConditionallyIfInList getList constr scope n t dt =
+    let s = Map.lookup t $ getList scope
+    in case s of
+        Just s' ->
+            conditionallyCreateStruct n $ do
+                ss <- getSubstitutions dt
+                queueDecl ss (constr s')
+        _ -> return ()
 
 -- varmistaa, että tietyn malli- tai intersektiotyypin metodi on olemassa
 -- tämä on siis sellainen funktio, joka muuntaa mallin tai intersektiotyypin
@@ -258,6 +274,10 @@ compile decls = do
                 concatMap (\d -> case d of
                     Stc s -> [(stcName s, s)]
                     _     -> []) decls
+
+    let enums = Map.fromList $ concatMap (\d -> case d of
+                    Enm e -> [(enmName e, e)]
+                    _     -> []) decls
     generateHeaderCode "#include <stdlib.h>\n"
     generateHeaderCode "#include <gc.h>\n"
     generateHeaderCode "#define true 1\n"
@@ -276,6 +296,7 @@ compile decls = do
       extends = supers,
       models = models,
       structs = structs,
+      enums = enums,
       definedStructs = [],
       definedMethods = [],
       definedExtends = [],
@@ -375,8 +396,30 @@ compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields 
         lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
         forM_ fs $ \(fname, ftype) -> do
             ftype' <- substitute ss ftype
-            lift $ generateSuperHeaderCode ("    " ++ ctype ftype' fname ++ ";\n")
+            lift $ generateSuperHeaderCode ("\t" ++ ctype ftype' fname ++ ";\n")
         lift $ generateSuperHeaderCode "};\n"
+compileDecl _ (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
+                                    enmCases = cs }) =
+    when (null tps || not (null ss)) $ do
+        let (Just etas) = forM tps (`Map.lookup` ss)
+        let dt = PInterface n etas
+        lift $ generateSuperHeaderCode ("enum e_" ++ pdt2str dt ++ " {\n")
+        forM_ cs $ \(cname, _) ->
+            lift $ generateSuperHeaderCode ("\t" ++ cname ++ ",\n")
+        lift $ generateSuperHeaderCode "};\n"
+        lift $ generateSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++ " "
+                                        ++ pdt2str dt ++ ";\n")
+        lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
+        lift $ generateSuperHeaderCode ("\tenum e_" ++ pdt2str dt ++ " _type;\n")
+        lift $ generateSuperHeaderCode "\tunion {\n"
+        forM_ cs $ \(cname, ftypes) -> do
+            lift $ generateSuperHeaderCode "\t\tstruct {\n"
+            forM_ (zip [1..] ftypes) $ \(i, ftype) -> do
+                ftype' <- substitute ss ftype
+                lift $ generateSuperHeaderCode ("\t\t\t" ++ ctype ftype' ("_k"++show i)
+                                                ++ ";\n")
+            lift $ generateSuperHeaderCode ("\t\t} "++cname++";\n")
+        lift $ generateSuperHeaderCode "\t};\n};\n"
 
 -- generoi malli- tai intersektiotyypin structin
 compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
@@ -388,15 +431,15 @@ compileStruct dt mname methods = do
     forM_ methods $ \f ->
         let r = sreturnType f `ifDollar` dt
             ps = dt : map snd (sparameters f)
-        in lift $ generateSuperHeaderCode ("    " ++
+        in lift $ generateSuperHeaderCode ("\t" ++
             ctype r ('(':'*':sname f ++ ")(" ++ cparams ps ++ ")") ++ ";\n")
     -- generoidaan kombinaatioiden oliot
     case dt of
         PSum dts -> forM_ (combinations dts) $ \c ->
-            lift $ generateSuperHeaderCode ("    " ++ ctype (sumOrModel c) (concatMap pdt2str c)
+            lift $ generateSuperHeaderCode ("\t" ++ ctype (sumOrModel c) (concatMap pdt2str c)
                                        ++ ";\n")
         _ -> return ()
-    lift $ generateSuperHeaderCode "    void *_obj;\n};\n"
+    lift $ generateSuperHeaderCode "\tvoid *_obj;\n};\n"
 
 -- generoi funktion, joka ottaa malli- tai intersektiotyypin sekä argumentteja
 -- ja muuntaa mallin tai intersektion oikeaan muotoon dereferoimalla _obj-kentän
@@ -498,6 +541,43 @@ compileStatement (Return expr)
          var <- compileExpressionAs rt expr
          thisPathReturns
          generateReturn var
+compileStatement (Match expr cases) = do
+    (exprv', dt) <- compileExpression PNothing expr
+    exprv <- tmpVar
+    generateCreate dt exprv exprv'
+    forM_ (zip [1..] cases) $ \(i, (mcond, body)) -> do
+        (cond, assigns) <- compileMatchCase exprv dt mcond
+        (if i == 1 then generateIf else generateElseIf) cond $ do
+            scope <- saveScope
+            forM_ assigns $ \(varname, vardt, value) -> do
+                generateCreate vardt varname value
+                putVar varname vardt
+            compileStatement body
+            restoreScope scope
+
+-- generoi ehtolauseen, jonka ollessa tosi patterni matchaa arvoon, sekä joukon
+-- muuttujasijoituksia (nimi, tyyppi, arvo)
+compileMatchCase :: String -> PDatatype -> MatchCondition ->
+                    Compiler (String, [(String, PDatatype, String)])
+compileMatchCase var dt mcond@(MatchCond caseName fieldMatches) = do
+    cs' <- getCases dt
+    case cs' of
+        Just cs ->
+            case lookup caseName cs of
+                Just fs -> do
+                    let cond = var++"._type=="++caseName
+                    let fsWithNames = zip (map (\i->"_k"++show i) [1..]) fs
+                    (conds, assigns) <- foldr (\(a, b) (as,bs) -> (a++"&&"++as,b:bs)) ("1",[])
+                        <$> forM (zip fsWithNames fieldMatches)
+                            (\((n,dt), fm) -> compileMatchCase n dt fm)
+                    return (cond++"&&"++conds, concat assigns)
+                Nothing ->
+                    -- jos ei matchata casea vastaan, kyseessä on muuttuja, johon
+                    -- vain sijoitetaan arvo
+                    return ("1", [(caseName, dt, var)])
+        Nothing -> do
+            tellError ("attempted to match a non-enum type " ++ show dt)
+            return ("NOTHING", [])
 
 compileCall name args = do
     f <- getFunction name
@@ -596,6 +676,27 @@ compileExpression expdt (NewStruct dt fieldValues) = do
             return (var, pdt)
         Nothing -> do
             tellError ("struct not found: " ++ show dt)
+            return ("NOTHING", PNothing)
+compileExpression expdt (NewEnumStruct dt caseName fieldValues) = do
+    ss <- getCurrentSubs
+    pdt <- substitute ss dt
+    cs' <- getCases pdt
+    case cs' of
+        Just cs -> do
+            let fs' = lookup caseName cs
+            case fs' of
+                Just fs -> do
+                    var <- tmpVar
+                    fieldvaluecodes <- checkargs fs fieldValues
+                    generateVarDecl pdt var
+                    forM_ (zip [1..] fieldvaluecodes) $ \(i, c) ->
+                        generateAssign (var++"."++caseName++"._k"++show i) c
+                    return (var, pdt)
+                Nothing -> do
+                    tellError ("enum case not found: " ++ show dt ++ "::" ++ caseName)
+                    return ("NOTHING", PNothing)
+        Nothing -> do
+            tellError ("enum not found: " ++ show dt)
             return ("NOTHING", PNothing)
 compileExpression expdt (NewPtrList dt size) = do
     var <- tmpVar

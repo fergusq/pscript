@@ -23,6 +23,7 @@ data Scope = Scope {
     extends :: Map.Map String [Extend],
     models :: Map.Map String Model,
     structs :: Map.Map String Struct,
+    enums :: Map.Map String EnumStruct,
     counter :: Int,
     definedStructs :: [String],
     definedMethods :: [String],
@@ -209,6 +210,20 @@ isConstant dt@(PInterface n _) = do
     return $ do
         s' <- s
         return $ isConst s'
+
+getCases :: PDatatype -> Compiler (Maybe [(String, [PDatatype])])
+getCases dt@(PInterface n _) = do
+    ss <- getSubstitutions dt
+    scope <- get
+    let e = Map.lookup n (enums scope)
+    case e of
+        Just e' -> do
+            a <- forM (enmCases e') $ \(n, ts) -> do
+                ts' <- forM ts $ \t' ->
+                    substitute ss t'
+                return (n, ts')
+            return $ Just a
+        Nothing -> return Nothing
 
 nextNum :: Compiler Int
 nextNum = do scope <- get
