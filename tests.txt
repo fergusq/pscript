@@ -1,0 +1,95 @@
+### 2+2=4
+Void main() {
+	println(2 + 2);
+}
+==>
+4
+---
+### Variable creation
+Void main() {
+	var i = 2 + 3;
+	println(i);
+}
+==>
+5
+---
+### If statement
+Void main() {
+	var i = 3*4;
+	if (i == 12) println("yeah");
+	else println("???");
+}
+==>
+yeah
+---
+### While statement
+Void main() {
+	var i = 10;
+	while (i > 2) {
+		println(i);
+		i = i - 1;
+	}
+}
+==>
+10
+9
+8
+7
+6
+5
+4
+3
+---
+### Squarable
+model Squarable { $ square(); }
+extend Int with Squarable { Int square() { return this*this; } }
+Void main() {
+	println(6.square());
+}
+==>
+36
+---
+### Squarable&Printable
+model Squarable { $ square(); }
+extend Int with Squarable { Int square() { return this*this; } }
+model Printable { Void print(); }
+extend Int with Printable { Void print() { println(this); } }
+Void shout(Squarable&Printable p) { p.square().print(); }
+Void main() {
+	shout(5);
+}
+==>
+25
+---
+### Matching
+enum YesNo {
+	Yes,
+	No
+}
+Void main() {
+	var a = new YesNo::Yes();
+	match (a) {
+		Yes -> println("yes");
+		No  -> println("no");
+	}
+}
+==>
+yes
+---
+### Maybe
+Void main() {
+	var a = new Maybe<Int>::Just(3);
+	match (a) {
+		Just(i) -> println("got: " + i);
+		Nothing -> println("nothing");
+	}
+	var b = new Maybe<Int>::Nothing();
+	match (b) {
+		Just(i) -> println("got: " + i);
+		Nothing -> println("nothing");
+	}
+}
+==>
+got: 3
+nothing
+---

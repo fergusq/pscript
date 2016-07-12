@@ -1,0 +1,73 @@
+function startsWith(needle, haystack) {
+	return #haystack >= #needle and haystack[:#needle] = needle
+}
+
+record TestReport(test_name, status, message) {
+	test_name : string = test_name
+	status : boolean = status
+	message : string = message
+}
+
+function doTest(name, code, eout) {
+	{
+		print("#include \"stdlib.ps\"\nextern Void puts(Str s); Void println(String s) puts(s.toString());")
+		print(line) for line in code
+	} | writeLines("tmp.ps")
+	{} | exec("./compile.sh", "tmp.ps") | {}
+	out := [{}() | exec(:l, "./etmp")]
+	{} | exec("rm", "tmp.ps", "etmp") | {}
+	if [ #out != #eout ] do
+		{} | exec("mv", "tmp.c", "fail.c") | {}
+		return new TestReport(name, FALSE, "expected "..#eout.." output lines, got "..#out)
+	done
+	for i in [seq(0,#eout-1)] do
+		if [ eout[i] != out[i] ] do
+			{} | exec("mv", "tmp.c", "fail.c") | {}
+			return new TestReport(name, FALSE, "expected `"..eout[i].."', got `"..out[i].."' (output line "..i..")")
+		done
+	done
+	{} | exec("rm", "tmp.c") | {}
+	return new TestReport(name, TRUE, "OK")
+}
+
+function main(testfile) {
+	results := []
+	i := 1
+	readLines(testfile) | for line do
+		if startsWith("### ", line) do
+			name := line[4:]
+			code := []
+			eout := []
+			pull(line)
+			until startsWith("==>", line) do
+				code += line
+				pull(line)
+			done
+			pull(line)
+			until startsWith("---", line) do
+				eout += line
+				pull(line)
+			done
+			push("Compiling test "..i.." ("..name..")... ")
+			result := doTest(name, code, eout)
+			print("["..if[result.status]do["OK"];else["FAILED"]done.."]")
+			results += result
+			i ++
+		else
+			error("syntax error: `" .. line .. "'") unless [ line =~ "\\s*" ]
+		done
+	done
+	i := 1
+	succs := 0
+	fails := 0
+	for test in results do
+		if [ test.status ] do
+			succs ++
+		else
+			print("Test "..i.." FAILED ("..test.test_name.."): "..test.message)
+			fails ++
+		done
+		i ++
+	done
+	print("PASSED TESTS: "..succs.." FAILURES: "..fails.." RATE: " .. succs/#results*100//1 .. " %")
+}
