@@ -161,6 +161,8 @@ it basically says that it can't compile method `AddingPrinterImpl<Bool>.print` b
 
 ## Type system reference
 
+![A graph of standard types](https://github.com/fergusq/pscript/raw/master/doc/types.png "The standard types")
+
 ### Primitive datatypes
 
 * `Bool`. Either `True` or `False`.
@@ -198,6 +200,17 @@ struct ArrayList<@T> {
 
 An array with mutable size. Supports `add` and `remove`-operations.
 
+### Standard enumerations
+
+#### The `Maybe` enumeration
+
+```
+enum Maybe<@T> {
+	Just(@T),
+	Nothing
+}
+```
+
 ### Standard models
 
 #### The `Appendable` model
@@ -218,7 +231,7 @@ model Container<@T> {
 }
 ```
 
-Implementing types: `Array`, `ArrayList`.
+Implementing types: `Array`, `ArrayList`, `Maybe`.
 
 #### The `HasSize` model
 
