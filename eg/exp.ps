@@ -1,0 +1,8 @@
+model A { $ a(); } extend Void with A { Void a() { return this; } }
+model B { $ b(); } extend Void with B { Void b() { return this; } }
+model C { $ c(); } extend Void with C { Void c() { return this; } }
+model D { $ d(); } extend Void with D { Void d() { return this; } }
+model E { $ e(); } extend Void with E { Void e() { return this; } }
+model F { $ f(); } extend Void with F { Void f() { return this; } }
+Void x(A&B&C&D&E&F abcdef) { abcdef.a().b().c().d().e().f(); }
+Void main()                { x(main()); }
