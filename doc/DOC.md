@@ -270,7 +270,7 @@ model Summable<@T> {
 Although the type system does not yet support this feature, it should be noted that `@T` shall be same as `$`, eg. the implementing type.
 Notably `Int` is not extended with this model due to some problems the author is having with the type system.
 
-Implementing types: `ArrayList`, `Str`, `String`
+Implementing types: `Array`, `ArrayList`, `Str`, `String`
 
 #### The `String` model
 
@@ -283,4 +283,4 @@ model String {
 All types that can be converted to `Str` should be implement this model.
 `String` can generally be used in place of `Str` to enable implicit type conversion.
 
-Implementing types: `Array`, `ArrayList`, `Int`, `Str`
+Implementing types: `Array`, `ArrayList`, `Bool`, `Int`, `Str`

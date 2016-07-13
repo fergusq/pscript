@@ -74,6 +74,25 @@ extend Str with Summable<String> {
 	}
 }
 
+extend Array<@T> with Summable<Array<@T>> {
+	Array<@T> operator +(Array<@T> a) {
+		var arr = new @T[this.len + a.len];
+		var i = 0;
+		for (v in this) {
+			arr[i] = v;
+			i = i + 1;
+		}
+		for (v in a) {
+			arr[i] = v;
+			i = i + 1;
+		}
+		return arr;
+	}
+	Array<@T> sumIdentity() {
+		return new @T[0];
+	}
+}
+
 // HASSIZE
 
 extern Int strlen(Str s);
@@ -192,21 +211,11 @@ extend ArrayList<@T> with List<@T> {
 
 extend ArrayList<@T> with Summable<ArrayList<@T>> {
 	ArrayList<@T> operator +(ArrayList<@T> l) {
-		var arr = new @T[this.size() + l.size()];
-		var i = 0;
-		for (v in this.elements) {
-			arr[i] = v;
-			i = i + 1;
-		}
-		for (v in l.elements) {
-			arr[i] = v;
-			i = i + 1;
-		}
-		return new ArrayList<@T> { arr };
+		return new ArrayList<@T> { this.elements + l.elements };
 	}
 	
 	ArrayList<@T> sumIdentity() {
-		return new ArrayList<@T> { new @T[0] };
+		return new ArrayList<@T> { this.elements.sumIdentity() };
 	}
 }
 
