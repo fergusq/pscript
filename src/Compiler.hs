@@ -3,6 +3,7 @@ module Compiler where
 import qualified Data.Map as Map
 import Control.Monad.Writer
 import Control.Monad.State
+import Control.Arrow
 import Data.Maybe
 import Data.Char
 import System.IO
@@ -204,9 +205,18 @@ ensureStructIsDefined dt =
             let n = "_Array1" ++ pdt2str a
             conditionallyCreateStruct n $ do
                 lift $ generateSuperSuperHeaderCode
-                    ("typedef struct " ++n ++ " " ++ n ++ ";\n")
+                    ("typedef struct " ++ n ++ " " ++ n ++ ";\n")
                 lift $ generateSuperHeaderCode
                     ("struct "++n++"{int len;" ++ ctype a "*ptr" ++ ";};\n")
+        PInterface "Func" (rt:ps) -> do
+            let n = pdt2str dt
+            conditionallyCreateStruct n $ do
+                lift $ generateSuperSuperHeaderCode
+                    ("typedef struct " ++ n ++ " " ++ n ++ ";\n")
+                lift $ generateSuperHeaderCode
+                    ("struct "++n++"{void* scope;"
+                     ++ ctype rt "(*func)(" ++ joinComma ("void*":map (`ctype` "") ps)
+                     ++ ");};\n")
         dt@(PInterface t as@(p:ps)) -> do
             scope <- get
             -- luodaan tyypin laajennokset, jos niitä ei ole jo luotu
@@ -275,7 +285,6 @@ ensureFunctionIsDefined ts func = unless (null $ funcTypeparameters func) $ do
 
 compile :: [Declaration] -> Generator ()
 compile decls = do
-    let pvars = [("true",pBool), ("false",pBool)]
     let functions = Map.fromList $
                 concatMap (\d -> case d of
                     Func f -> [(name f, f)]
@@ -304,8 +313,6 @@ compile decls = do
                     _     -> []) decls
     generateHeaderCode "#include <stdlib.h>\n"
     generateHeaderCode "#include <gc.h>\n"
-    generateHeaderCode "#define true 1\n"
-    generateHeaderCode "#define false 0\n"
     generateHeaderCode "void * alloc(size_t x) { return GC_malloc(x); }\n"
     let scope = Scope {
       varscope = VarScope {
@@ -329,7 +336,7 @@ compile decls = do
     }
     runStateT (do -- TODO siisti tämä
         rec (\ds -> do
-            mapM_ (compileDecl pvars) ds
+            mapM_ (compileDecl []) ds
             s@Scope { declarationQueue = q } <- get
             put s { declarationQueue = [] }
             return [q]) $ map (\a -> (Map.empty, a)) decls
@@ -388,7 +395,7 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
         ms <- getModelMethods dt
         unless (length ms == length fs) $
             tellError ("extension of " ++ show edt ++ " with " ++ show dt ++
-                       "does not satisfy the interface: there should be " ++
+                       " does not satisfy the interface: there should be " ++
                        show (length ms) ++ " methods, not " ++ show (length fs))
         forM_ fs (\f -> do
             unless (null $ funcTypeparameters f) $
@@ -815,6 +822,54 @@ compileExpression expdt (Cast dt expr) = do
     pdt <- substitute ss dt
     var <- compileExpressionAs pdt expr
     return (var, pdt)
+compileExpression expdt (Lambda ps' rt' stmt) = do
+    -- tarkistetaan, että parametrit eivät peitä muuttujia
+    forM_ ps' $ \(n, _) -> do
+        v <- getVar n
+        when (isJust v) $ tellError ("lambda parameter `" ++ n
+                                     ++ "' shadows an existing variable")
+    -- selvitetään muuttujat, jotka lambda kaappaa
+    scope <- get
+    let currentVariables = Map.toList $ variables $ varscope scope
+    -- luodaan nimi lambdafunktiolle
+    num <- nextNum
+    let fn = "_lambda" ++ show num
+        sn = fn ++ "_scope"
+        wn = fn ++ "_wrapper"
+    -- lisätään varsinainen lambdafunktio jonoon
+    ss <- getCurrentSubs
+    queueDecl ss $ Func $ Function fn [] (map (second pdt2dt) currentVariables++ps') rt' stmt
+    -- tehdään structi kaapattavien muuttujien säilömiseen
+    lift $ generateHeaderCode ("struct "++sn++" {\n")
+    forM_ currentVariables $ \(n, dt) ->
+        lift $ generateHeaderCode ("\t" ++ ctype dt n ++ ";\n")
+    lift $ generateHeaderCode "};\n"
+    -- tehdään wrapperifunktio, joka lukee structista muuttujien arvot ja syöttää ne
+    -- varsinaiselle funktiolle
+    rt <- substitute ss rt'
+    ps <- mapM (\(n, dt') -> do dt <- substitute ss dt'; return (n, dt)) ps'
+    let parcode (n,dt) = ctype dt n
+    lift $ generateHeaderCode (ctype rt
+        (wn ++ "("++ joinComma
+            ("void *_scopep":map parcode ps)
+         ++ ")") ++ "{\n")
+    lift $ generateHeaderCode ("\tstruct " ++ sn ++ " *_scope = (struct "
+                               ++ sn ++ "*) _scopep;\n")
+    let argcodes = map (("_scope->" ++).fst) currentVariables ++ map fst ps
+    lift $ generateHeaderCode ("\treturn " ++ fn ++ "(" ++ joinComma argcodes ++ ");\n};\n")
+    -- luodaan nykyisistä muuttujista olio
+    scopev <- tmpVar
+    generateAssign ("struct " ++ sn ++ " *" ++ scopev) ("malloc(sizeof(struct "++sn++"))")
+    forM_ currentVariables $ \(n, dt) ->
+        generateAssign (scopev++"->"++n) n
+    -- luodaan olio, joka sisältää pointterin muuttujastructiin ja wrapperifunktioon
+    let dt = PInterface "Func" (rt:map snd ps)
+    ensureStructIsDefined dt
+    var <- tmpVar
+    generateCreate dt var ("{"++scopev++","++wn++"}")
+    return (var, dt)
+compileExpression expdt TrueConstant = return ("1", pBool)
+compileExpression expdt FalseConstant = return ("0", pBool)
 compileExpression expdt (MethodCall obj method args)
     = do (objv, dt) <- compileExpression PNothing obj
          compileMethodCall objv dt method args
@@ -901,6 +956,13 @@ compileMethodCall obj (PInterface "Pointer" [dt]) method args
              generateAssign (obj ++ "["++index++"]") v
              tellWarning "pointer arithmetic is not typesafe"
              return (v, dt)
+
+-- PPointer
+compileMethodCall obj dt@(PInterface "Func" (rt:ps)) method args
+    | method == "call"
+        = do vars <- checkargs ps args
+             objv <- createTmpVarIfNeeded dt obj
+             return (objv ++ ".func("++joinComma ((objv++".scope"):vars)++")", rt)
 
 -- Määrittelemättömät metodit
 compileMethodCall obj dt@(PSum dts) method args

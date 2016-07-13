@@ -21,6 +21,8 @@ data TokenClass
 	| TokenConst
 	| TokenAs
 	| TokenMatch
+	| TokenTrue
+	| TokenFalse
 	| TokenSub
 	| TokenSuper
 	| TokenInt Int
@@ -58,6 +60,7 @@ data TokenClass
 	| TokenField
 	| TokenPercent
 	| TokenEM
+	| TokenPlusPlus
 	deriving Show
 
 lexer :: Int -> String -> [Token]
@@ -67,6 +70,7 @@ lexer ln ('/':'*':cs) = lexBlockComment ln cs
 lexer ln ('=':'=':cs) = Token ln TokenEqEq : lexer ln cs
 lexer ln ('!':'=':cs) = Token ln TokenNeq : lexer ln cs
 lexer ln ('=':cs) = Token ln TokenEq : lexer ln cs
+lexer ln ('+':'+':cs) = Token ln TokenPlusPlus : lexer ln cs
 lexer ln ('+':cs) = Token ln TokenPlus : lexer ln cs
 lexer ln ('-':'>':cs) = Token ln TokenArrow : lexer ln cs
 lexer ln ('-':cs) = Token ln TokenMinus : lexer ln cs
@@ -146,4 +150,6 @@ lexVar ln cs =
 		("super",rest)   -> Token ln TokenSuper : lexer ln rest
 		("enum",rest)   -> Token ln TokenEnum : lexer ln rest
 		("match",rest)   -> Token ln TokenMatch : lexer ln rest
+		("true",rest)   -> Token ln TokenTrue : lexer ln rest
+		("false",rest)   -> Token ln TokenFalse : lexer ln rest
 		(var,rest)       -> Token ln (TokenVarname var) : lexer ln rest

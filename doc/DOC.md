@@ -242,7 +242,7 @@ Implementing types: `Array`, `ArrayList`.
 #### The `Container` model
 
 ```
-model Container<@T> {
+model Container<@T> : StreamSource<@T> {
 	Bool contains(@T value);
 }
 ```

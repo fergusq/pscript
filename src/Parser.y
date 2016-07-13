@@ -26,6 +26,8 @@ import Lexer
 	const		{ Token _ TokenConst }
 	as		{ Token _ TokenAs }
 	match		{ Token _ TokenMatch }
+	true		{ Token _ TokenTrue }
+	false		{ Token _ TokenFalse }
 	int		{ Token _ (TokenInt $$) }
 	str		{ Token _ (TokenString $$) }
 	var		{ Token _ (TokenVarname $$) }
@@ -253,6 +255,7 @@ Prim	: int					{ Int $1 }
 	| '(' Exp ')'				{ $2 }
 	| '[' Args ']'				{ List $2 }
 	| '[' Exp dotdot Exp ']'		{ Range $2 $4 }
+	| '(' Params ')' arrow Datatype '{' Stmts '}'	{ Lambda $2 $5 $ Block $7 }
 	| new Datatype '[' Exp ']'		{ NewList $2 $4 }
 	| new Datatype '{' Args '}'		{ NewStruct $2 $4 }
 	| new Datatype '{' '}'			{ NewStruct $2 [] }
@@ -260,6 +263,8 @@ Prim	: int					{ Int $1 }
 	| new Datatype field var '(' ')'	{ NewEnumStruct $2 $4 [] }
 	| new Datatype '*' '(' Exp ')'		{ NewPtrList $2 $5 }
 	| Preprim as Datatype			{ Cast $3 $1 }
+	| true					{ TrueConstant }
+	| false					{ FalseConstant }
 
 {
 parseError :: [Token] -> a
@@ -349,6 +354,8 @@ data Expression
 	| FieldGet Expression String
 	| FieldSet Expression String Expression
 	| Cast Datatype Expression
+	| Lambda [(String,Datatype)] Datatype Statement
+	| TrueConstant | FalseConstant
 	deriving Show
 }
 

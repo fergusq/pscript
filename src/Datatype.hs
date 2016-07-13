@@ -30,20 +30,17 @@ ifDollar PNothing _          = PNothing
 -- Muuttaa tietotyypin PDatatype-olioksi
 
 dt2pdt :: Datatype -> PDatatype
-dt2pdt (Typename "Array" [dt]) = pArray $ dt2pdt dt
-dt2pdt (Typename "Int" []) = pInteger
-dt2pdt (Typename "Char" []) = pChar
-dt2pdt (Typename "Str" []) = pString
-dt2pdt (Typename "Bool" []) = pBool
-dt2pdt (Typename "Void" []) = pVoid
 dt2pdt (Typename name dts) = PInterface name (map dt2pdt dts)
 dt2pdt (SumType dts) = PSum (map dt2pdt dts)
 dt2pdt DollarType = PDollar
 
+pdt2dt :: PDatatype -> Datatype
+pdt2dt (PInterface name dts) = Typename name (map pdt2dt dts)
+pdt2dt (PSum dts) = SumType (map pdt2dt dts)
+
 ctype :: PDatatype -> String -> String
 ctype (PInterface "Array" [a]) n = "struct _Array1" ++ pdt2str a ++ " " ++ n
 ctype (PInterface "Pointer" [a]) n = ctype a ('*':n)
-ctype (PInterface "Func" (r:ps)) n = ctype r ("(*" ++ n ++ ")(" ++ cparams ps ++ ")")
 ctype (PInterface "Int" []) n = "int " ++ n
 ctype (PInterface "Bool" []) n = "int " ++ n
 ctype (PInterface "Char" []) n = "char " ++ n
