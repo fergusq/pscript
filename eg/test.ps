@@ -82,7 +82,7 @@ const struct AddingPrinterImpl<@T> { @T prefix; }
 
 extend AddingPrinterImpl<@T> with AddingPrinter<@T> {
 	Void print(@T value) {
-		puts((this.prefix + value).toString());
+		puts((this.prefix ++ value).toString());
 	}
 }
 
@@ -111,9 +111,12 @@ Int[] fromTo(Int from, Int to) {
 
 //
 
-extend Int with Appendable<Int> {
-	Int append(Int i) {
+extend Int with Summable<Int> {
+	Int operator ++(Int i) {
 		return this + i;
+	}
+	Int sumIdentity() {
+		return 0;
 	}
 }
 
@@ -128,7 +131,7 @@ Void shoutAll(Printable&Squarable[] ps) {
 }
 
 Void main() {
-	var arr = fromTo(1, 4.append(2));
+	var arr = fromTo(1, 4 ++ 2);
 	for (i in arr) i.square().print();
 	shoutAll(arr);
 	shoutAll(10.duplicate());
@@ -167,12 +170,12 @@ Void main() {
 	}
 	var a = just(id(3));
 	match (a) {
-		Just(i) -> puts("got: " + i);
+		Just(i) -> puts("got: " ++ i);
 		Nothing -> puts("nothing");
 	}
 	var b = new Maybe<Int>::Nothing();
 	match (b) {
-		Just(i) -> puts("got: " + i);
+		Just(i) -> puts("got: " ++ i);
 		Nothing -> puts("nothing");
 	}
 }

@@ -4,7 +4,7 @@ digraph G {
     HasSize [shape="oval"]
     Container [shape="oval", group="collections"]
     List [shape="oval", group="collections"]
-    Summable [shape="oval"]
+    Summable [shape="oval", group="collections"]
     Appendable [shape="oval", group="collections"]
     
     StreamSource [shape="oval", group="pipes"]
@@ -35,7 +35,6 @@ digraph G {
     HasSize -> Array
     HasSize -> ArrayList
     
-    Eq -> Int
     Eq -> Str
     Eq -> String
     Eq -> Array

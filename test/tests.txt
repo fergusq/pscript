@@ -80,12 +80,12 @@ yes
 Void main() {
 	var a = new Maybe<Int>::Just(3);
 	match (a) {
-		Just(i) -> println("got: " + i);
+		Just(i) -> println("got: " ++ i);
 		Nothing -> println("nothing");
 	}
 	var b = new Maybe<Int>::Nothing();
 	match (b) {
-		Just(i) -> println("got: " + i);
+		Just(i) -> println("got: " ++ i);
 		Nothing -> println("nothing");
 	}
 }
@@ -118,7 +118,7 @@ Void main() {
 	var a = [1, 2, 3];
 	var b = [4, 3, 2].append(4);
 	b[2] = 5;
-	println(a + b);
+	println(a ++ b);
 }
 ==>
 [1, 2, 3, 4, 3, 5, 4]
@@ -128,14 +128,9 @@ Void main() {
 	var a = new ArrayList<Int> { [3, 2, 1] };
 	var b = new ArrayList<Int> { [2, 3, 4] }.append(6);
 	a.add(7);
-	println(a);
-	var i = b.remove(2);
-	b[1] = i;
-	println("" + i + "," + b);
-	println(a + b);
+	b[1] = b.remove(2);
+	println(a ++ b);
 }
 ==>
-ArrayList { [3, 2, 1, 7] }
-4,ArrayList { [2, 4, 6] }
 ArrayList { [3, 2, 1, 7, 2, 4, 6] }
 ---

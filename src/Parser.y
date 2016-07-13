@@ -61,6 +61,7 @@ import Lexer
 	or		{ Token _ TokenOr }
 	dotdot		{ Token _ TokenDotDot }
 	field		{ Token _ TokenField }
+	plusplus	{ Token _ TokenPlusPlus }
 
 %%
 
@@ -105,6 +106,7 @@ ExternFunc
 	| Datatype operator Op2 '(' Parameter ',' Parameter ')' ';'	{ Function $3 [] [$5, $7] $1 Extern }
 
 Op1	: '[' ']'			{ "op_get" }
+	| plusplus			{ "op_append" }
 	| '+'				{ "op_add" }
 	| '-'				{ "op_sub" }
 	| '*'				{ "op_mul" }
@@ -219,10 +221,13 @@ Cmp1	: Cmp1 eq Cmp2			{ MethodCall $1 "op_eq" [$3] }
 	| Cmp1 neq Cmp2			{ MethodCall $1 "op_neq" [$3] }
 	| Cmp2				{ $1 }
 
-Cmp2	: Cmp2 '<' Sum			{ MethodCall $1 "op_lt" [$3] }
-	| Cmp2 '>' Sum			{ MethodCall $1 "op_gt" [$3] }
-	| Cmp2 le Sum			{ MethodCall $1 "op_le" [$3] }
-	| Cmp2 ge Sum			{ MethodCall $1 "op_ge" [$3] }
+Cmp2	: Cmp2 '<' Append		{ MethodCall $1 "op_lt" [$3] }
+	| Cmp2 '>' Append		{ MethodCall $1 "op_gt" [$3] }
+	| Cmp2 le Append		{ MethodCall $1 "op_le" [$3] }
+	| Cmp2 ge Append		{ MethodCall $1 "op_ge" [$3] }
+	| Append			{ $1 }
+
+Append	: Append plusplus Sum		{ MethodCall $1 "op_append" [$3] }
 	| Sum				{ $1 }
 
 Sum	: Sum '+' Term			{ MethodCall $1 "op_add" [$3] }

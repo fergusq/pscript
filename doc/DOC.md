@@ -107,6 +107,9 @@ Generic methods in PScript support a feature called _static duck typing_. Simila
 Duck typing means that a method accepts arguments not based on their type but on the method names they implement. The
 term comes from the saying "if it looks like a duck, it is a duck".
 
+_The example below does not work in the current version of PScript, as the string concatenation operation has been changed_
+_from_ `+` _to_ `++`_._
+
 PScript allows calling arbitrary methods on values that have a type parameter as their type. Lets look at an example. Here
 we define an "adding printer", a printer that adds a value to the object to be printed before printing.
 
@@ -190,6 +193,17 @@ It also supports `[]` and `[]=` -methods.
 
 `T[]` is equilevelent to `Array<T>`.
 
+#### The `ArrayIterator` structure
+
+```
+struct ArrayIterator<@T> {
+	@T[] elements;
+	Int location;
+}
+```
+
+A basic implementation of `Iterator`.
+
 #### The `ArrayList` structure
 
 ```
@@ -211,6 +225,8 @@ enum Maybe<@T> {
 }
 ```
 
+Represents a value that may or may not be present. Implements both `Container` and `Eq`.
+
 ### Standard models
 
 #### The `Appendable` model
@@ -231,6 +247,8 @@ model Container<@T> {
 }
 ```
 
+All collections that have finite size should implement this model.
+
 Implementing types: `Array`, `ArrayList`, `Maybe`.
 
 #### The `HasSize` model
@@ -241,14 +259,25 @@ model HasSize {
 }
 ```
 
-Things that have size implement this model.
+All collections that have finite but variable size should implement this model.
 
 Implementing types: `Array`, `ArrayList`, `Str`, `String`
+
+#### The `Iterator` model
+
+```
+model Iterator<@T> {
+	@T next();
+	Bool hasNext();
+}
+```
+
+Implementing types: `ArrayIterator`
 
 #### The `List` model
 
 ```
-model List<@T> : HasSize {
+model List<@T> : Container<@T>, HasSize {
 	@T operator [] (Int index);
 	Void operator []= (Int index, @T value);
 	Void add(@T value);
@@ -258,17 +287,44 @@ model List<@T> : HasSize {
 
 Implementing typs: `ArrayList`
 
+#### The `StreamSource` model
+
+```
+model StreamSource<@T> {
+	Iterator<@T> iterator();
+}
+```
+
+All collections that are iterable should implement this model. Provides a starting point for pipeline calculations.
+
+Implementing types: `Array`, `ArrayList`, `ArrayIterator`, `Iterator`, `Maybe`
+
+#### The `StreamOperation` model
+
+```
+model StreamOperation<@T, @U> {
+	@U operator |(StreamSource<@T> source);
+}
+```
+
+Takes a stream of `@T` and returns `@U`, which can be either a new `StreamSource` or the final result of pipeline.
+
+`operator |` is an unique operator, as it is the right operand thats method is actually called.
+
+No implementing types yet.
+
 #### The `Summable` model
 
 ```
 model Summable<@T> {
-	$ operator +(@T t);
+	$ operator ++(@T t);
 	@T sumIdentity();
 }
 ```
 
+All types of collections that can be appended to other collections of the same type should implement this model.
+
 Although the type system does not yet support this feature, it should be noted that `@T` shall be same as `$`, eg. the implementing type.
-Notably `Int` is not extended with this model due to some problems the author is having with the type system.
 
 Implementing types: `Array`, `ArrayList`, `Str`, `String`
 
