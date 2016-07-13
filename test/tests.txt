@@ -116,10 +116,26 @@ Void main() {
 ### Arrays
 Void main() {
 	var a = [1, 2, 3];
-	var b = [4, 3, 2];
+	var b = [4, 3, 2].append(4);
 	b[2] = 5;
 	println(a + b);
 }
 ==>
-[1, 2, 3, 4, 3, 5]
+[1, 2, 3, 4, 3, 5, 4]
+---
+### ArrayLists
+Void main() {
+	var a = new ArrayList<Int> { [3, 2, 1] };
+	var b = new ArrayList<Int> { [2, 3, 4] }.append(6);
+	a.add(7);
+	println(a);
+	var i = b.remove(2);
+	b[1] = i;
+	println("" + i + "," + b);
+	println(a + b);
+}
+==>
+ArrayList { [3, 2, 1, 7] }
+4,ArrayList { [2, 4, 6] }
+ArrayList { [3, 2, 1, 7, 2, 4, 6] }
 ---

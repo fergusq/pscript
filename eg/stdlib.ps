@@ -225,7 +225,7 @@ extend Array<@T> with StreamSource<@T> {
 
 // CONTAINER
 
-model Container<@T> {
+model Container<@T> : StreamSource<@T> {
 	Bool contains(@T value);
 }
 
@@ -299,6 +299,7 @@ extend ArrayList<@T> with List<@T> {
 				arr[i] = v;
 			else if (i > index)
 				arr[i-1] = v;
+			i = i + 1;
 		}
 		this.elements = arr;
 		return t;
