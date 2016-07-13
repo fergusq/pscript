@@ -93,6 +93,10 @@ generateSuperHeaderCode :: String -> Generator ()
 generateSuperHeaderCode code
     = lift . lift $ tell [code]
 
+generateSuperSuperHeaderCode :: String -> Generator ()
+generateSuperSuperHeaderCode code
+    = lift . lift . lift $ tell [code]
+
 -- Apufunktioita tyyppien tarkistamiseen ja virheisiin
 
 typemismatch :: PDatatype -> PDatatype -> Compiler ()
@@ -199,7 +203,7 @@ ensureStructIsDefined dt =
         PInterface "Array" [a] -> do
             let n = "_Array1" ++ pdt2str a
             conditionallyCreateStruct n $ do
-                lift $ generateSuperHeaderCode
+                lift $ generateSuperSuperHeaderCode
                     ("typedef struct " ++n ++ " " ++ n ++ ";\n")
                 lift $ generateSuperHeaderCode
                     ("struct "++n++"{int len;" ++ ctype a "*ptr" ++ ";};\n")
@@ -415,8 +419,8 @@ compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields 
     when (null tps || not (null ss)) $ do
         let (Just etas) = forM tps (`Map.lookup` ss)
         let dt = PInterface n etas
-        lift $ generateSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
-                                        (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
+        lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
+                                             (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
         lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
         forM_ fs $ \(fname, ftype) -> do
             ftype' <- substitute ss ftype
@@ -431,8 +435,8 @@ compileDecl _ (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
         forM_ cs $ \(cname, _) ->
             lift $ generateSuperHeaderCode ("\t" ++ pdt2str dt ++ "_" ++ cname ++ ",\n")
         lift $ generateSuperHeaderCode "};\n"
-        lift $ generateSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++ " "
-                                        ++ pdt2str dt ++ ";\n")
+        lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++ " "
+                                             ++ pdt2str dt ++ ";\n")
         lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
         lift $ generateSuperHeaderCode ("\tenum e_" ++ pdt2str dt ++ " _type;\n")
         lift $ generateSuperHeaderCode "\tunion {\n"
@@ -448,8 +452,8 @@ compileDecl _ (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
 -- generoi malli- tai intersektiotyypin structin
 compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
 compileStruct dt mname methods = do
-    lift $ generateSuperHeaderCode ("typedef struct _" ++ mname ++ "* " ++
-                                    mname ++ ";\n")
+    lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ mname ++ "* " ++
+                                         mname ++ ";\n")
     lift $ generateSuperHeaderCode ("struct _" ++ mname ++ "{\n")
     -- generoidaan vtable
     forM_ methods $ \f ->
@@ -861,12 +865,18 @@ compileMethodCall obj (PInterface "Int" []) method args
         || method == "op_le" || method == "op_ge"
         = do (var:vars) <- checkargs [pInteger] args
              return ("("++obj++coperator method++var++")", pBool)
+    | method == "op_neg"
+        = do checkargs [] args
+             return ("-("++obj++")", pInteger)
 
--- PInteger
-compileMethodCall obj (PInterface "Int" []) method args
+-- PBool
+compileMethodCall obj (PInterface "Bool" []) method args
     | method == "op_and" || method == "op_or"
         = do (var:vars) <- checkargs [pBool] args
              return ("("++obj++coperator method++var++")", pBool)
+    | method == "op_not"
+        = do checkargs [] args
+             return ("!("++obj++")", pBool)
 
 -- PArray
 compileMethodCall obj (PInterface "Array" [dt]) method args

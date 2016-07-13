@@ -52,35 +52,25 @@ extend Int with Duplicable {
 	}
 }
 
-// Pipe models
+// Pipes
 
-model PipeOutput<@T> {
-	Void operator |(PipeInput<@T> pipe);
-}
-
-model PipeInput<@T> {
-	Void consume(@T t);
-}
-
-extend Array<@T> with PipeOutput<@T> {
-	Void operator |(PipeInput<@T> pipe) {
-		for (element in this) {
-			pipe.consume(element);
+extend Int with StreamOperation<Int, Void> {
+	Void operator |(StreamSource<Int> source) {
+		var i = source.iterator();
+		while (i.hasNext()) {
+			(i.next()*this).print();
 		}
-	}
-}
-
-extend Int with PipeInput<Int> {
-	Void consume(Int i) {
-		(this*i).print();
 	}
 }
 
 const struct Printer<@T> { }
 
-extend Printer<@T> with PipeInput<@T> {
-	Void consume(@T s) {
-		("-> "+s).print();
+extend Printer<@T> with StreamOperation<@T, Void> {
+	Void operator |(StreamSource<@T> source) {
+		var i = source.iterator();
+		while (i.hasNext()) {
+			i.next().toString().print();
+		}
 	}
 }
 

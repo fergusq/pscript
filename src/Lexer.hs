@@ -57,6 +57,7 @@ data TokenClass
 	| TokenAt
 	| TokenField
 	| TokenPercent
+	| TokenEM
 	deriving Show
 
 lexer :: Int -> String -> [Token]
@@ -94,6 +95,7 @@ lexer ln ('@':cs) = Token ln TokenAt : lexer ln cs
 lexer ln (':':':':cs) = Token ln TokenField : lexer ln cs
 lexer ln (':':cs) = Token ln TokenColon : lexer ln cs
 lexer ln ('%':cs) = Token ln TokenPercent : lexer ln cs
+lexer ln ('!':cs) = Token ln TokenEM : lexer ln cs
 lexer ln ('"':cs) = lexString ln "" cs
 lexer ln ('\n':cs) = lexer (ln+1) cs
 lexer ln (c:cs)

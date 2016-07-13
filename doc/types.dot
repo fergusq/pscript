@@ -1,0 +1,69 @@
+digraph G {
+    // Models
+    String [shape="oval"]
+    HasSize [shape="oval"]
+    Container [shape="oval", group="collections"]
+    List [shape="oval", group="collections"]
+    Summable [shape="oval"]
+    Appendable [shape="oval", group="collections"]
+    
+    StreamSource [shape="oval", group="pipes"]
+    Iterator [shape="oval", group="iterators"]
+    
+    // Structs
+    ArrayList [shape="hexagon", group="collections"]
+    Array [shape="hexagon", group="collections"]
+    ArrayIterator [shape="hexagon", group="iterators"]
+    
+    // Enums
+    Maybe [shape="house", group="collections"]
+    
+    // Primitive types
+    Str [shape="box", group="primitives"]
+    Int [shape="box", group="primitives"]
+    Bool [shape="box", group="primitives"]
+    //Char [shape="box", group="primitives"]
+    
+    String -> Int
+    String -> Bool
+    String -> Str
+    String -> Array
+    String -> ArrayList
+    
+    HasSize -> Str
+    HasSize -> String
+    HasSize -> Array
+    HasSize -> ArrayList
+    
+    Eq -> Int
+    Eq -> Str
+    Eq -> String
+    Eq -> Array
+    Eq -> ArrayList
+    Eq -> Maybe
+    
+    StreamSource -> Container [style=dotted]
+    Container -> Array
+    Container -> ArrayList
+    Container -> Maybe
+    
+    List -> ArrayList
+    HasSize -> List [style=dotted]
+    Container -> List [style=dotted]
+    
+    StreamSource -> Maybe
+    StreamSource -> Array
+    StreamSource -> ArrayList
+    StreamSource -> Iterator
+    StreamSource -> ArrayIterator
+    
+    Summable -> Str
+    Summable -> String
+    Summable -> Array
+    Summable -> ArrayList
+    
+    Appendable -> Array
+    Appendable -> ArrayList
+    
+    Iterator -> ArrayIterator
+}

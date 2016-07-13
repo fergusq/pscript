@@ -1,6 +1,7 @@
 #ifndef _STDLIB_PS
 #define _STDLIB_PS
 
+extern Int strcmp(Str a, Str b);
 extern Void strcpy(Str d, Str s);
 extern Void strcat(Str d, Str s);
 extern Void sprintf(Str d, Str f, Int i);
@@ -42,6 +43,44 @@ extend Array<@T> with String {
 			i = i + 1;
 		}
 		return str + "]";
+	}
+}
+
+// EQ
+
+model Eq<@T> {
+	Bool operator ==(@T t);
+	Bool operator !=(@T t);
+}
+
+extend Str with Eq<String> {
+	Bool operator ==(String t) {
+		return strcmp(this, t.toString()) == 0;
+	}
+	Bool operator !=(String t) {
+		return strcmp(this, t.toString()) != 0;
+	}
+}
+
+extend String with Eq<String> {
+	Bool operator ==(String t) {
+		return this.toString() == t;
+	}
+	Bool operator !=(String t) {
+		return this.toString() != t;
+	}
+}
+
+extend Array<@T> with Eq<Array<@T>> {
+	Bool operator ==(@T[] t) {
+		if (this.len != t.len) return false;
+		for (i in [0 .. this.len-1]) {
+			if (this[i] != t[i]) return false;
+		}
+		return true;
+	}
+	Bool operator !=(@T[] t) {
+		return !(this == t);
 	}
 }
 
@@ -136,6 +175,54 @@ extend Array<@T> with Appendable<@T> {
 	}
 }
 
+// PIPES
+
+model Iterator<@T> {
+	@T next();
+	Bool hasNext();
+}
+
+struct ArrayIterator<@T> {
+	@T[] elements;
+	Int location;
+}
+
+extend ArrayIterator<@T> with Iterator<@T> {
+	@T next() {
+		this.location = this.location + 1;
+		return this.elements[this.location - 1];
+	}
+	Bool hasNext() {
+		return this.location < this.elements.len;
+	}
+}
+
+model StreamSource<@T> {
+	Iterator<@T> iterator();
+}
+
+extend Iterator<@T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		return this;
+	}
+}
+
+extend ArrayIterator<@T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		return this;
+	}
+}
+
+model StreamOperation<@T, @U> {
+	@U operator | (StreamSource<@T> source);
+}
+
+extend Array<@T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		return new ArrayIterator<@T> { this, 0 };
+	}
+}
+
 // CONTAINER
 
 model Container<@T> {
@@ -175,6 +262,15 @@ extend ArrayList<@T> with HasSize {
 extend ArrayList<@T> with String {
 	Str toString() {
 		return "ArrayList { " + this.elements + " }";
+	}
+}
+
+extend ArrayList<@T> with Eq<ArrayList<@T>> {
+	Bool operator ==(ArrayList<@T> al) {
+		return this.elements == al.elements;
+	}
+	Bool operator !=(ArrayList<@T> al) {
+		return this.elements != al.elements;
 	}
 }
 
@@ -225,6 +321,12 @@ extend ArrayList<@T> with Appendable<@T> {
 	}
 }
 
+extend ArrayList<@T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		return new ArrayIterator<@T> { this.elements, 0 };
+	}
+}
+
 // MAYBE
 
 enum Maybe<@T> {
@@ -236,13 +338,38 @@ Maybe<@T> just<@T>(@T value) {
 	return new Maybe<@T>::Just(value);
 }
 
+extend Maybe<@T> with Eq<Maybe<@T>> {
+	Bool operator ==(Maybe<@T> al) {
+		match (this) {
+			Just(v1) -> match (al) {
+				Just(v2) -> return true;
+			}
+			Nothing -> match (al) {
+				Nothing -> return true;
+			}
+		}
+		return false;
+	}
+	Bool operator !=(Maybe<@T> al) {
+		return !(this == al);
+	}
+}
+
 extend Maybe<@T> with Container<@T> {
 	Bool contains(@T value) {
 		match (this) {
 			Just(v) -> return v == value;
-			Nothing -> return false;
 		}
 		return false;
+	}
+}
+
+extend Maybe<@T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		match (this) {
+			Just(v) -> return new ArrayIterator<@T> { [v], 0 };
+		}
+		return new ArrayIterator<@T> { new @T[0], 0 };
 	}
 }
 

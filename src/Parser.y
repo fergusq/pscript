@@ -51,6 +51,7 @@ import Lexer
 	'@'		{ Token _ TokenAt }
 	'|'		{ Token _ TokenPipe }
 	'%'		{ Token _ TokenPercent }
+	'!'		{ Token _ TokenEM }
 	arrow		{ Token _ TokenArrow }
 	eq		{ Token _ TokenEqEq }
 	neq		{ Token _ TokenNeq }
@@ -103,8 +104,7 @@ ExternFunc
 	| Datatype operator Op1 '(' Parameter ')' ';'			{ Function $3 [] [$5] $1 Extern }
 	| Datatype operator Op2 '(' Parameter ',' Parameter ')' ';'	{ Function $3 [] [$5, $7] $1 Extern }
 
-Op1	: '|'				{ "op_pipe" }
-	| '[' ']'			{ "op_get" }
+Op1	: '[' ']'			{ "op_get" }
 	| '+'				{ "op_add" }
 	| '-'				{ "op_sub" }
 	| '*'				{ "op_mul" }
@@ -118,6 +118,7 @@ Op1	: '|'				{ "op_pipe" }
 	| ge				{ "op_ge" }
 	| and				{ "op_and" }
 	| or				{ "op_or" }
+	| '|'				{ "op_pipe" }
 Op2	: '[' ']' '='			{ "op_set" }
 
 Params	: Parameter ',' Params		{ ($1 : $3) }
@@ -174,7 +175,7 @@ Stmt	: Call ';'			{ Expr $1 }
 	| var '=' Exp ';'		{ Assign $1 $3 }
 	| return Exp ';'		{ Return $2 }
 	| '{' Stmts '}'			{ Block $2 }
-	| Preprim '|' Pipe ';'		{ Expr $ MethodCall $1 "op_pipe" [$3] }
+	| Pipe '|' Preprim ';'		{ Expr $ MethodCall $3 "op_pipe" [$1] }
 	| match '(' Exp ')' '{' Matches '}'	{ Match $3 $6 }
 	| match '(' Exp ')' '{' '}'	{ Match $3 [] }
 
@@ -233,7 +234,7 @@ Term	: Term '*' Pipe			{ MethodCall $1 "op_mul" [$3] }
 	| Term '%' Pipe			{ MethodCall $1 "op_mod" [$3] }
 	| Pipe				{ $1 }
 
-Pipe	: Pipe '|' Preprim		{ MethodCall $1 "op_pipe" [$3] }
+Pipe	: Pipe '|' Preprim		{ MethodCall $3 "op_pipe" [$1] }
 	| Preprim			{ $1 }
 
 Preprim	: Call				{ $1 }
@@ -242,6 +243,8 @@ Preprim	: Call				{ $1 }
 Prim	: int					{ Int $1 }
 	| str					{ Str $1 }
 	| var					{ Var $1 }
+	| '!' Preprim				{ MethodCall $2 "op_not" [] }
+	| '-' Preprim				{ MethodCall $2 "op_neg" [] }
 	| '(' Exp ')'				{ $2 }
 	| '[' Args ']'				{ List $2 }
 	| '[' Exp dotdot Exp ']'		{ Range $2 $4 }
