@@ -171,6 +171,7 @@ it basically says that it can't compile method `AddingPrinterImpl<Bool>.print` b
 * `Bool`. Either `True` or `False`.
 * `Char`. Internally a 8-bit integer. Currently does not support any operators.
   The only use of this type is to define `Str`.
+* `Func<@R, @P...>`. Type of anonymous functions.
 * `Int`. A 32-bit integer.
 * `Pointer<@T>`. A pointer to a list of values of type `@T`.
 * `Str`. An alias for `Char*`.
@@ -311,7 +312,7 @@ Takes a stream of `@T` and returns `@U`, which can be either a new `StreamSource
 
 `operator |` is an unique operator, as it is the right operand thats method is actually called.
 
-No implementing types yet.
+Implementing types: `Forall`, `Func`
 
 #### The `Summable` model
 

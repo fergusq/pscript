@@ -177,7 +177,7 @@ extend Array<@T> with Appendable<@T> {
 
 // PIPES
 
-model Iterator<@T> {
+model Iterator<@T> : StreamSource<@T> {
 	@T next();
 	Bool hasNext();
 }
@@ -197,6 +197,20 @@ extend ArrayIterator<@T> with Iterator<@T> {
 	}
 }
 
+const struct MappingIterator<@From, @To> {
+	@From -> @To mappingFunction;
+	Iterator<@From> source;
+}
+
+extend MappingIterator<@F, @T> with Iterator<@T> {
+	@T next() {
+		return this.mappingFunction.call(this.source.next());
+	}
+	Bool hasNext() {
+		return this.source.hasNext();
+	}
+}
+
 model StreamSource<@T> {
 	Iterator<@T> iterator();
 }
@@ -213,14 +227,43 @@ extend ArrayIterator<@T> with StreamSource<@T> {
 	}
 }
 
-model StreamOperation<@T, @U> {
-	@U operator | (StreamSource<@T> source);
+extend MappingIterator<@F, @T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		return this;
+	}
 }
 
 extend Array<@T> with StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return new ArrayIterator<@T> { this, 0 };
 	}
+}
+
+model StreamOperation<@T, @U> {
+	@U operator |(StreamSource<@T> source);
+}
+
+extend Func<@R, @P> with StreamOperation<@P, StreamSource<@R>> {
+	StreamSource<@R> operator |(StreamSource<@P> source) {
+		return new MappingIterator<@P, @R> { this, source.iterator() };
+	}
+}
+
+const struct Forall<@T> {
+	@T->Void callback;
+}
+
+extend Forall<@T> with StreamOperation<@T, Void> {
+	Void operator |(StreamSource<@T> source) {
+		var i = source.iterator();
+		while (i.hasNext()) {
+			this.callback.call(i.next());
+		}
+	}
+}
+
+StreamOperation<@T, Void> forAll<@T>(@T->Void callback) {
+	return new Forall<@T> { callback };
 }
 
 // CONTAINER

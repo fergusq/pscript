@@ -14,6 +14,8 @@ digraph G {
     ArrayList [shape="hexagon", group="collections"]
     Array [shape="hexagon", group="collections"]
     ArrayIterator [shape="hexagon", group="iterators"]
+    MappingIterator [shape="hexagon", group="iterators"]
+    Forall [shape="hexagon", group="iterators"]
     
     // Enums
     Maybe [shape="house", group="collections"]
@@ -23,6 +25,7 @@ digraph G {
     Int [shape="box", group="primitives"]
     Bool [shape="box", group="primitives"]
     //Char [shape="box", group="primitives"]
+    Func [shape="box", group="primitives"]
     
     String -> Int
     String -> Bool
@@ -49,12 +52,17 @@ digraph G {
     List -> ArrayList
     HasSize -> List [style=dotted]
     Container -> List [style=dotted]
+    Eq -> List [style=dotted]
     
     StreamSource -> Maybe
     StreamSource -> Array
     StreamSource -> ArrayList
     StreamSource -> Iterator
     StreamSource -> ArrayIterator
+    StreamSource -> MappingIterator
+    
+    StreamOperation -> Func
+    StreamOperation -> Forall
     
     Summable -> Str
     Summable -> String
@@ -64,5 +72,7 @@ digraph G {
     Appendable -> Array
     Appendable -> ArrayList
     
+    StreamSource -> Iterator [style=dotted]
     Iterator -> ArrayIterator
+    Iterator -> MappingIterator
 }

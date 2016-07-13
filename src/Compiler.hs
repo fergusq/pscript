@@ -72,31 +72,35 @@ generateCode code
 
 generateVarHeader :: PDatatype -> String -> Generator ()
 generateVarHeader dt name
-    = lift $ tell [ctype dt name ++ ";\n"]
+    = lift . lift $ tell [ctype dt name ++ ";\n"]
 
 generateFunctionHeader :: PDatatype -> [PDatatype] -> String -> Generator ()
 generateFunctionHeader r ps name
-    = lift $ tell [ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
+    = lift . lift $ tell [ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
 
 generateExternHeader :: PDatatype -> String -> Generator ()
 generateExternHeader dt name
-    = lift $ tell ["extern " ++ ctype dt name ++ ";\n"]
+    = lift . lift $ tell ["extern " ++ ctype dt name ++ ";\n"]
 
 generateExternFunctionHeader :: PDatatype -> [PDatatype] -> String -> Generator ()
 generateExternFunctionHeader r ps name
-    = lift $ tell ["extern " ++ ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
+    = lift . lift $ tell ["extern " ++ ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
+
+generateSubHeaderCode :: String -> Generator ()
+generateSubHeaderCode code
+    = lift $ tell [code]
 
 generateHeaderCode :: String -> Generator ()
 generateHeaderCode code
-    = lift $ tell [code]
+    = lift . lift $ tell [code]
 
 generateSuperHeaderCode :: String -> Generator ()
 generateSuperHeaderCode code
-    = lift . lift $ tell [code]
+    = lift . lift . lift $ tell [code]
 
 generateSuperSuperHeaderCode :: String -> Generator ()
 generateSuperSuperHeaderCode code
-    = lift . lift . lift $ tell [code]
+    = lift . lift . lift . lift $ tell [code]
 
 -- Apufunktioita tyyppien tarkistamiseen ja virheisiin
 
@@ -269,6 +273,10 @@ ensureMethodIsDefined dt model fname = do
 -- varmistaa, että tyyppiparametrisoidun laajennoksen haluttu versio generoidaan
 ensureExtendIsDefined :: PDatatype -> Extend -> Compiler ()
 ensureExtendIsDefined dt@(PInterface _ ts) extend = unless (null $ eTypeparameters extend) $ do
+    let tps = eTypeparameters extend
+    when (length tps /= length ts) $
+        tellError ("invalid extension of generic type " ++ show dt ++ ": "
+                   ++ "wrong number of type parameters in extension declaration")
     let ss = Map.fromList $ zip (eTypeparameters extend) ts
     conditionallyCreateExtend (show dt ++ show (model extend)) $
         queueDecl ss $ Ext extend
@@ -356,8 +364,10 @@ compileDecl pvars (ss, Func func) =
     when (null (funcTypeparameters func) || not (null ss)) $ do
         scope <- get
         let fname = name func
-        params <- mapM (\(n,d) -> substitute ss d >>= \d' -> return (n,d')) (parameters func)
-        rtype <- substitute ss $ returnType func
+        params <- mapM (\(n,d) ->
+            substitute' (Just $ "parameter type of "++fname) ss d
+            >>= \d' -> return (n,d')) (parameters func)
+        rtype <- substitute' (Just $ "return type of "++fname) ss $ returnType func
         let vscope = varscope scope
         put scope { varscope = vscope {
             functionName = fname,
@@ -382,8 +392,8 @@ compileDecl _ (ss, Mdl m) =
 compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                                 eMethods = fs, eTypeparameters = tps}) =
     when (null tps || not (null ss)) $ do
-        dt <- substitute ss m
-        let (Just etas) = forM tps (`Map.lookup` ss)
+        dt <- substitute' (Just $ "extension declaration "++n++" with "++show m) ss m
+        etas <- substituteTpList ("extend " ++ n) ss tps
         let edt = PInterface n etas
         prs <- getPrerequisites dt
         es <- getSubstitutedExtends edt
@@ -409,7 +419,7 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                     forM_ (zip (returnType f:map snd (parameters f))
                         (sreturnType mf:map snd (sparameters mf))) $
                         \(dt', mpdt') -> do
-                            pdt <- substitute ss dt'
+                            pdt <- substitute' (Just "extension method signature") ss dt'
                             let mpdt = mpdt' `ifDollar` edt
                             unless (pdt == mpdt) $
                                 tellError ("extension method " ++ show edt ++ "." ++ name f ++
@@ -424,19 +434,19 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
 compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs,
                                 isConst = c }) =
     when (null tps || not (null ss)) $ do
-        let (Just etas) = forM tps (`Map.lookup` ss)
+        etas <- substituteTpList n ss tps
         let dt = PInterface n etas
         lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
                                              (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
         lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
         forM_ fs $ \(fname, ftype) -> do
-            ftype' <- substitute ss ftype
+            ftype' <- substitute' (Just $ "struct field "++show ftype++" "++fname) ss ftype
             lift $ generateSuperHeaderCode ("\t" ++ ctype ftype' fname ++ ";\n")
         lift $ generateSuperHeaderCode "};\n"
 compileDecl _ (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
                                     enmCases = cs }) =
     when (null tps || not (null ss)) $ do
-        let (Just etas) = forM tps (`Map.lookup` ss)
+        etas <- substituteTpList n ss tps
         let dt = PInterface n etas
         lift $ generateSuperHeaderCode ("enum e_" ++ pdt2str dt ++ " {\n")
         forM_ cs $ \(cname, _) ->
@@ -450,11 +460,25 @@ compileDecl _ (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
         forM_ cs $ \(cname, ftypes) -> do
             lift $ generateSuperHeaderCode "\t\tstruct {\n"
             forM_ (zip [1..] ftypes) $ \(i, ftype) -> do
-                ftype' <- substitute ss ftype
+                ftype' <- substitute' (Just $ "type of enum case field "++cname++":"++show i)
+                    ss ftype
                 lift $ generateSuperHeaderCode ("\t\t\t" ++ ctype ftype' ("_k"++show i)
                                                 ++ ";\n")
             lift $ generateSuperHeaderCode ("\t\t} "++cname++";\n")
         lift $ generateSuperHeaderCode "\t};\n};\n"
+
+substituteTpList :: String -> Subs -> [String] -> Compiler [PDatatype]
+substituteTpList n ss tps = case forM tps (`Map.lookup` ss) of
+    Just etas -> return etas
+    Nothing -> do
+        tellError ("instance of declaration "
+                   ++ n ++ "<" ++ joinComma (map ('@':) tps) ++ ">" ++
+                   " has unknown type parameters")
+        if Map.null ss then tellNote "no known type parameter substitutions" else do
+            tellNote "known type parameter substitutions are:"
+            forM_ (Map.toList ss) $ \(n, dt) ->
+                tellNote ('@':n ++ " = " ++ show dt)
+        return []
 
 -- generoi malli- tai intersektiotyypin structin
 compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
@@ -638,15 +662,15 @@ compileCall expdt name args = do
                 let ps' = map snd $ parameters f
                 (acts, ss) <- forxM (zip ps' args) rtss $
                     \(par', arg) ss -> do
-                            pt <- substitute' False ss par'
+                            pt <- substitute' Nothing ss par'
                             (acode, atype) <- compileExpression pt arg
                             ss' <- Map.fromList <$>
                                 matchTypeArguments par' atype
                             return ((acode, atype), ss `Map.union` ss')
 
                 -- selvitetään lopulliset tyypit inferoinnin perusteella
-                rt <- substitute ss rt'
-                ps <- mapM (substitute ss) ps'
+                rt <- substitute' (Just $ "return type of called " ++ name) ss rt'
+                ps <- mapM (substitute' (Just $ "parameter type of called " ++ name) ss) ps'
 
                 -- tehdään argumenttien vaatimat tyyppimuunnokset
                 argcodes <- forM (zip ps acts) $ uncurry $ \pt (argcode', argtype') -> do
@@ -744,7 +768,7 @@ compileExpression expdt (Range from to) = do
 compileExpression expdt (NewList dt size) = do
     var <- tmpVar
     ss <- getCurrentSubs
-    pdt <- substitute ss dt
+    pdt <- substitute' (Just "list constructor") ss dt
     sizev' <- compileExpressionAs pInteger size
     sizev <- createTmpVarIfNeeded pInteger sizev'
     generateCreate (pArray pdt) var ('{': sizev ++ ", alloc("
@@ -753,7 +777,7 @@ compileExpression expdt (NewList dt size) = do
     return (var, pArray pdt)
 compileExpression expdt (NewStruct dt fieldValues) = do
     ss <- getCurrentSubs
-    pdt <- substitute ss dt
+    pdt <- substitute' (Just "struct constructor") ss dt
     fs' <- getFields pdt
     case fs' of
         Just fs -> do
@@ -773,7 +797,7 @@ compileExpression expdt (NewStruct dt fieldValues) = do
             return ("NOTHING", PNothing)
 compileExpression expdt (NewEnumStruct dt caseName fieldValues) = do
     ss <- getCurrentSubs
-    pdt <- substitute ss dt
+    pdt <- substitute' (Just "enum case constructor") ss dt
     cs' <- getCases pdt
     case cs' of
         Just cs -> do
@@ -796,7 +820,7 @@ compileExpression expdt (NewEnumStruct dt caseName fieldValues) = do
 compileExpression expdt (NewPtrList dt size) = do
     var <- tmpVar
     ss <- getCurrentSubs
-    pdt <- substitute ss dt
+    pdt <- substitute' (Just "pointer allocation") ss dt
     sizev <- compileExpressionAs pInteger size
     generateCreate (pPointer pdt) var ("alloc("
                                        ++ sizev
@@ -819,7 +843,7 @@ compileExpression expdt (FieldSet obj field val) = do
         return (valv, dt2)
 compileExpression expdt (Cast dt expr) = do
     ss <- getCurrentSubs
-    pdt <- substitute ss dt
+    pdt <- substitute' (Just $ "cast to " ++ show dt) ss dt
     var <- compileExpressionAs pdt expr
     return (var, pdt)
 compileExpression expdt (Lambda ps' rt' stmt) = do
@@ -846,17 +870,19 @@ compileExpression expdt (Lambda ps' rt' stmt) = do
     lift $ generateHeaderCode "};\n"
     -- tehdään wrapperifunktio, joka lukee structista muuttujien arvot ja syöttää ne
     -- varsinaiselle funktiolle
-    rt <- substitute ss rt'
-    ps <- mapM (\(n, dt') -> do dt <- substitute ss dt'; return (n, dt)) ps'
+    rt <- substitute' (Just "return type of lambda function") ss rt'
+    ps <- mapM (\(n, dt') -> do
+        dt <- substitute' (Just "parameter type of lambda function") ss dt'
+        return (n, dt)) ps'
     let parcode (n,dt) = ctype dt n
-    lift $ generateHeaderCode (ctype rt
+    lift $ generateSubHeaderCode (ctype rt
         (wn ++ "("++ joinComma
             ("void *_scopep":map parcode ps)
          ++ ")") ++ "{\n")
-    lift $ generateHeaderCode ("\tstruct " ++ sn ++ " *_scope = (struct "
+    lift $ generateSubHeaderCode ("\tstruct " ++ sn ++ " *_scope = (struct "
                                ++ sn ++ "*) _scopep;\n")
     let argcodes = map (("_scope->" ++).fst) currentVariables ++ map fst ps
-    lift $ generateHeaderCode ("\treturn " ++ fn ++ "(" ++ joinComma argcodes ++ ");\n};\n")
+    lift $ generateSubHeaderCode ("\treturn " ++ fn ++ "(" ++ joinComma argcodes ++ ");\n};\n")
     -- luodaan nykyisistä muuttujista olio
     scopev <- tmpVar
     generateAssign ("struct " ++ sn ++ " *" ++ scopev) ("malloc(sizeof(struct "++sn++"))")

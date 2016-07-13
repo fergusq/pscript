@@ -13,10 +13,11 @@ data ErrorSeverity = ENote | EWarn | EErr
 data ErrorMsg = ErrorMsg ErrorSeverity String String
 
 type Generator = WriterT [String] -- koodi
+                 (WriterT [String] -- headeri funktiomäärityksille
                  (WriterT [String] -- headeri funktioille
                  (WriterT [String] -- headeri structeille
                  (WriterT [String] -- headeri typedefeille
-                 (Writer [ErrorMsg]))))
+                 (Writer [ErrorMsg])))))
 type Compiler a = StateT Scope Generator a
 
 type Subs = Map.Map String PDatatype
@@ -141,7 +142,8 @@ getPrerequisites dt@(PInterface a _) = do
     scope <- get
     ss <- getSubstitutions dt
     case Map.lookup a $ models scope of
-            Just m -> mapM (substitute ss) $ prerequisites m
+            Just m -> mapM (substitute' (Just $ "prerequisite of "++show dt) ss) $
+                prerequisites m
             Nothing -> return []
 
 getExtends :: PDatatype -> Compiler [Extend]
@@ -164,7 +166,9 @@ getSubstitutedExtends dt@(PInterface _ ts) = do
     es <- getExtends dt
     forM es (\e -> do
         let ss = Map.fromList $ zip (eTypeparameters e) ts
-        substitute ss $ model e
+        substitute' (Just $ "extension declaration of "++show dt
+                     ++" with "++show(model e)++" [substitutedextends]")
+            ss $ model e
      )
 
 getSubstitutedExtends PNothing = return []
@@ -178,7 +182,9 @@ getDTypeMethods dt@(PInterface _ ts)
     = do es <- getExtends dt
          ms <- forM es $ \e -> do
              let ss = Map.fromList $ zip (eTypeparameters e) ts
-             t <- substitute ss $ model e
+             t <- substitute' (Just $ "extension declaration of "++show dt
+                ++" with "++show(model e)++" [dtypemethods]")
+                ss $ model e
              mms <- getModelMethods t
              forM mms $ \m ->
                 return (e, m)
@@ -208,7 +214,7 @@ getFields dt@(PInterface n _) = do
     case s of
         Just s' -> do
             a <- forM (stcFields s') $ \(n, t) -> do
-                t' <- substitute ss t
+                t' <- substitute' (Just $ "field "++n++" of "++show dt) ss t
                 return (n, t')
             return $ Just a
         Nothing -> return Nothing
@@ -230,7 +236,7 @@ getCases dt@(PInterface n _) = do
         Just e' -> do
             a <- forM (enmCases e') $ \(n, ts) -> do
                 ts' <- forM ts $ \t' ->
-                    substitute ss t'
+                    substitute' (Just $ "case declaration "++n++" of "++show dt) ss t'
                 return (n, ts')
             return $ Just a
         Nothing -> return Nothing
@@ -274,15 +280,18 @@ conditionallyCreateExtend n callback = do
 
 tellError :: String -> Compiler ()
 tellError msg = do fname <- getCurrentFunctionName
-                   lift . lift . lift . lift . lift $ tell [ErrorMsg EErr ("in " ++ fname) msg]
+                   lift . lift . lift . lift . lift . lift $
+                    tell [ErrorMsg EErr ("in " ++ fname) msg]
 
 tellWarning :: String -> Compiler ()
 tellWarning msg = do fname <- getCurrentFunctionName
-                     lift . lift . lift . lift . lift $ tell [ErrorMsg EWarn ("in " ++ fname) msg]
+                     lift . lift . lift . lift . lift . lift $
+                        tell [ErrorMsg EWarn ("in " ++ fname) msg]
 
 tellNote :: String -> Compiler ()
 tellNote msg = do fname <- getCurrentFunctionName
-                  lift . lift . lift . lift . lift $ tell [ErrorMsg ENote ("in " ++ fname) msg]
+                  lift . lift . lift . lift . lift . lift $
+                    tell [ErrorMsg ENote ("in " ++ fname) msg]
 
 generateLater :: Compiler () -> Compiler ()
 generateLater code = do
@@ -302,22 +311,28 @@ data FSignature = FSignature {
 
 -- Korvaa tyyppiparametrit tyyppiargumentoilla
 
-substitute' :: Bool -> Subs -> Datatype -> Compiler PDatatype
-substitute' err subs (Typeparam t) = case Map.lookup t subs of
-                                    Just dt -> return dt
-                                    _       -> do when err $ tellError
-                                                                ("Unknown typeparameter "++t
-                                                                ++ " of " ++ show subs)
-                                                  return PNothing
-substitute' err subs (Typename n ts) = do
-    ts' <- (mapM $ substitute subs) ts
+substitute' :: Maybe String -> Subs -> Datatype -> Compiler PDatatype
+substitute' place' subs (Typeparam t) =
+    case Map.lookup t subs of
+        Just dt -> return dt
+        _       -> do
+            case place' of
+                Just place -> do
+                    tellError ("Unknown typeparameter @"++t++" in "++place)
+                    if Map.null subs then tellNote "no known type parameter substitutions"
+                        else do
+                        tellNote "known typeparameter substitutions are:"
+                        forM_ (Map.toList subs) $ \(n, dt) ->
+                            tellNote ('@':n ++ " = " ++ show dt)
+                Nothing -> return ()
+            return PNothing
+substitute' place' subs (Typename n ts) = do
+    ts' <- (mapM $ substitute' place' subs) ts
     return $ PInterface n ts'
-substitute' err subs (SumType ts) = do
-    ts' <- mapM (substitute subs) ts
+substitute' place' subs (SumType ts) = do
+    ts' <- mapM (substitute' place' subs) ts
     return $ PSum ts'
-substitute' err subs t = return $ dt2pdt t
-
-substitute = substitute' True
+substitute' place' subs t = return $ dt2pdt t
 
 subsFunction :: Subs -> Function -> Compiler FSignature
 subsFunction subs f = do
@@ -329,4 +344,4 @@ subsFunction subs f = do
                         sreturnType = rt
                     }
                     where
-                    s = substitute subs
+                    s = substitute' (Just $ "signature of "++name f) subs

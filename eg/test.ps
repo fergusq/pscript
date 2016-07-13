@@ -179,8 +179,9 @@ Void main() {
 		Nothing -> puts("nothing");
 	}
 	
-	var f = (Int i) -> Int { return i + 1; };
-	f.call(3).print();
+	var mapper = (Int i) -> Int { return i + 1; };
+	var printer = (Int i) -> Void { i.print(); };
+	[1, 2, 3] | mapper | forAll(printer);
 }
 
 #include "stdlib.ps"
