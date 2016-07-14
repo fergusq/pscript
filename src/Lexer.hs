@@ -23,6 +23,8 @@ data TokenClass
 	| TokenMatch
 	| TokenTrue
 	| TokenFalse
+	| TokenModule
+	| TokenImport
 	| TokenSub
 	| TokenSuper
 	| TokenInt Int
@@ -148,8 +150,10 @@ lexVar ln cs =
 		("as",rest)      -> Token ln TokenAs : lexer ln rest
 		("sub",rest)     -> Token ln TokenSub : lexer ln rest
 		("super",rest)   -> Token ln TokenSuper : lexer ln rest
-		("enum",rest)   -> Token ln TokenEnum : lexer ln rest
+		("enum",rest)    -> Token ln TokenEnum : lexer ln rest
 		("match",rest)   -> Token ln TokenMatch : lexer ln rest
-		("true",rest)   -> Token ln TokenTrue : lexer ln rest
+		("true",rest)    -> Token ln TokenTrue : lexer ln rest
 		("false",rest)   -> Token ln TokenFalse : lexer ln rest
+		("module",rest)  -> Token ln TokenModule : lexer ln rest
+		("import",rest)  -> Token ln TokenImport : lexer ln rest
 		(var,rest)       -> Token ln (TokenVarname var) : lexer ln rest

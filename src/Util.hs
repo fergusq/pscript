@@ -36,6 +36,13 @@ rec f [] = return ()
 rec f a  = do v <- f a
               rec f (concat v)
 
+rec2 :: (Monad m) => (a -> m ([a], [b])) -> [a] -> m [b]
+rec2 f [] = return []
+rec2 f as = do
+    (as', bs) <- foldr (\(x,y) (xs,ys) -> (x:xs, y:ys)) ([], []) <$> forM as f
+    bs' <- concat <$> forM as' (rec2 f)
+    return (concat bs ++ bs')
+
 firstJust :: [Maybe a] -> Maybe a
 firstJust []           = Nothing
 firstJust (Just a:as)  = Just a

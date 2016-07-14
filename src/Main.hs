@@ -4,15 +4,21 @@ import Control.Monad
 import Control.Monad.Writer
 import System.IO
 import System.Exit
+import System.Environment
 
 import Lexer
 import Parser
 import Scope
 import Compiler
+import Util
 
-compileCode c = do
-    let lexemes = lexer 1 c
-    let tree = parsePScript lexemes
+compileCode :: [String] -> IO ()
+compileCode files = do
+    tree <- flip rec2 files $ \file -> do
+        c <- readFile file
+        let lexemes = lexer 1 c
+        let (ModuleDecl name imports decls) = parsePScript lexemes
+        return (map (++".ps") imports, decls)
     let ((((((_, code0), code1), header0), header1), header2), errors) =
          runWriter $ runWriterT $ runWriterT $ runWriterT $ runWriterT $ runWriterT $ compile tree
     forM_ header2 putStr
@@ -30,5 +36,5 @@ compileCode c = do
     putStrLn ""
     when (sum errs > 0) exitFailure
 
-main = do c <- getContents
-          compileCode c
+main = do files <- getArgs
+          compileCode files

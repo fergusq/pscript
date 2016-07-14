@@ -28,6 +28,8 @@ import Lexer
 	match		{ Token _ TokenMatch }
 	true		{ Token _ TokenTrue }
 	false		{ Token _ TokenFalse }
+	module		{ Token _ TokenModule }
+	import		{ Token _ TokenImport }
 	int		{ Token _ (TokenInt $$) }
 	str		{ Token _ (TokenString $$) }
 	var		{ Token _ (TokenVarname $$) }
@@ -67,7 +69,13 @@ import Lexer
 
 %%
 
-Prog	: Decl Prog			{ ($1 : $2) }
+Prog	: module var ';' Imports Decls	{ ModuleDecl $2 $4 $5 }
+	| module var ';' Decls		{ ModuleDecl $2 [] $4 }
+
+Imports	: import var ';' Imports	{ ($2 : $4) }
+	| import var ';'		{ [$2] }
+
+Decls	: Decl Decls			{ ($1 : $2) }
 	| Decl				{ [$1] }
 
 Decl	: Func				{ Func $1 }
@@ -271,6 +279,8 @@ parseError :: [Token] -> a
 parseError ((Token ln t):ts)
 	= error ("[Line " ++ show ln ++ "] Parse error on " ++ show t)
 parseError [] = error "Parser error on EOF"
+
+data ModuleDecl = ModuleDecl String [String] [Declaration]
 
 data Declaration =
 	Func Function

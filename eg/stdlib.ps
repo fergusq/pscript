@@ -1,5 +1,4 @@
-#ifndef _STDLIB_PS
-#define _STDLIB_PS
+module stdlib;
 
 extern Int strcmp(Str a, Str b);
 extern Void strcpy(Str d, Str s);
@@ -416,5 +415,3 @@ extend Maybe<@T> with StreamSource<@T> {
 		return new ArrayIterator<@T> { new @T[0], 0 };
 	}
 }
-
-#endif

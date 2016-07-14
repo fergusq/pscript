@@ -1,3 +1,5 @@
+module test;
+
 extern Void printf(Str s, Int i);
 extern Void sprintf(Str to, Str format, Int i);
 extern Void puts(Str s);
@@ -179,9 +181,8 @@ Void main() {
 		Nothing -> puts("nothing");
 	}
 	
-	var mapper = (Int i) -> Int { return i + 1; };
+	var adder = (Int i, Int j) -> Int { return i + j; };
+	var mapper = (Int i) -> Int { return adder.call(i, 1); };
 	var printer = (Int i) -> Void { i.print(); };
 	[1, 2, 3] | mapper | forAll(printer);
 }
-
-#include "stdlib.ps"
