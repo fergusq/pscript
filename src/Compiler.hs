@@ -274,12 +274,15 @@ ensureMethodIsDefined dt model fname = do
 ensureExtendIsDefined :: PDatatype -> Extend -> Compiler ()
 ensureExtendIsDefined dt@(PInterface _ ts) extend = unless (null $ eTypeparameters extend) $ do
     let tps = eTypeparameters extend
-    when (length tps /= length ts) $
-        tellError ("invalid extension of generic type " ++ show dt ++ ": "
-                   ++ "wrong number of type parameters in extension declaration")
-    let ss = Map.fromList $ zip (eTypeparameters extend) ts
-    conditionallyCreateExtend (show dt ++ show (model extend)) $
-        queueDecl ss $ Ext extend
+    if length tps /= length ts then do
+        let severity = if isVarargsType dt then tellWarning else tellError
+        severity ("invalid extension of generic type " ++ show dt ++ " with "
+                  ++ show (model extend)
+                  ++ ": wrong number of type parameters in extension declaration")
+     else do
+        let ss = Map.fromList $ zip (eTypeparameters extend) ts
+        conditionallyCreateExtend (show dt ++ show (model extend)) $
+            queueDecl ss $ Ext extend
 
 -- varmistaa, että tyyppiparametrisoidun funktion haluttu versio generoidaan
 ensureFunctionIsDefined :: [PDatatype] -> Function -> Compiler ()
@@ -362,12 +365,17 @@ compileDecl pvars (ss, Func decl@Function { name = fname, parameters = params,
     = lift $ generateExternFunctionHeader (dt2pdt rtype) [] fname
 compileDecl pvars (ss, Func func) =
     when (null (funcTypeparameters func) || not (null ss)) $ do
-        scope <- get
         let fname = name func
+        -- substituoidaan parametreissa ja palautustyypeissä käytetyt tyyppiparametrit
+        -- tyyppiargumenteilla
         params <- mapM (\(n,d) ->
             substitute' (Just $ "parameter type of "++fname) ss d
             >>= \d' -> return (n,d')) (parameters func)
         rtype <- substitute' (Just $ "return type of "++fname) ss $ returnType func
+        -- varmistetaan, että tyyppien käyttämiseen tarvittavat c-structit luodaan
+        forM_ (rtype:map snd params) $ \dt -> ensureStructIsDefined dt
+        -- alustetaan scope
+        scope <- get
         let vscope = varscope scope
         put scope { varscope = vscope {
             functionName = fname,
@@ -376,6 +384,7 @@ compileDecl pvars (ss, Func func) =
             subs = ss,
             doesReturn = False
         }}
+        -- varsinainen kääntäminen
         lift $ generateFunctionHeader rtype (map snd params) fname
         generateFunction rtype fname params
         compileStatement $ body func
@@ -388,7 +397,8 @@ compileDecl _ (ss, Mdl m) =
         let mname = modelName m
         let dt = PInterface mname [] --TODO
         fs <- mapM (subsFunction Map.empty) $ methods m
-        compileStruct dt mname fs
+        conditionallyCreateStruct (pdt2str dt) $
+            compileStruct dt mname fs
 compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                                 eMethods = fs, eTypeparameters = tps}) =
     when (null tps || not (null ss)) $ do

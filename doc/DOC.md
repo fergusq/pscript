@@ -312,7 +312,7 @@ Takes a stream of `@T` and returns `@U`, which can be either a new `StreamSource
 
 `operator |` is an unique operator, as it is the right operand thats method is actually called.
 
-Implementing types: `Forall`, `Func`
+Implementing types: `Fold`, `Forall`, `Func`
 
 #### The `Summable` model
 

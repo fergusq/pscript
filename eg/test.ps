@@ -183,6 +183,8 @@ Void main() {
 	
 	var adder = (Int i, Int j) -> Int { return i + j; };
 	var mapper = (Int i) -> Int { return adder.call(i, 1); };
+	var toList = (Array<Int> array, Int i) -> Array<Int> { return array.append(i); };
 	var printer = (Int i) -> Void { i.print(); };
 	[1, 2, 3] | mapper | forAll(printer);
+	puts(([1, 2, 3] | mapper | fold(new Int[0], toList)).toString());
 }

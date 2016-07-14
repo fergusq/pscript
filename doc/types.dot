@@ -1,4 +1,5 @@
 digraph G {
+    node [fontname="Monospace"]
     // Models
     String [shape="oval"]
     HasSize [shape="oval"]
@@ -52,7 +53,6 @@ digraph G {
     List -> ArrayList
     HasSize -> List [style=dotted]
     Container -> List [style=dotted]
-    Eq -> List [style=dotted]
     
     StreamSource -> Maybe
     StreamSource -> Array

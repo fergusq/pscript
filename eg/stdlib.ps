@@ -265,6 +265,25 @@ StreamOperation<@T, Void> forAll<@T>(@T->Void callback) {
 	return new Forall<@T> { callback };
 }
 
+struct Fold<@T, @U> {
+	@U collection;
+	(@U, @T)->@U collector;
+}
+
+extend Fold<@T, @U> with StreamOperation<@T, @U> {
+	@U operator |(StreamSource<@T> source) {
+		var i = source.iterator();
+		while (i.hasNext()) {
+			this.collection = this.collector.call(this.collection, i.next());
+		}
+		return this.collection;
+	}
+}
+
+StreamOperation<@T, @U> fold<@T, @U>(@U collection, (@U, @T)->@U collector) {
+	return new Fold<@T, @U> { collection, collector };
+}
+
 // CONTAINER
 
 model Container<@T> : StreamSource<@T> {

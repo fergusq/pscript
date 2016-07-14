@@ -10,10 +10,14 @@ record TestReport(test_name, status, message) {
 
 function doTest(name, code, eout) {
 	{
-		print("#include \"eg/stdlib.ps\"\nextern Void puts(Str s); Void println(String s) puts(s.toString());")
+		print("module tmp;\nextern Void puts(Str s); Void println(String s) puts(s.toString());")
 		print(line) for line in code
 	} | writeLines("tmp.ps")
 	{} | exec("script/compile.sh", "tmp.ps") | {}
+	if [ not fileExists("etmp") ] do
+		{} | exec("mv", "tmp.ps", "fail.ps") | {}
+		return new TestReport(name, FALSE, "Compiler error (try to compile manually)")
+	done
 	out := [{}() | exec(:l, "./etmp")]
 	{} | exec("rm", "tmp.ps", "etmp") | {}
 	if [ #out != #eout ] do

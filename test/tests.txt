@@ -134,3 +134,39 @@ Void main() {
 ==>
 ArrayList { [3, 2, 1, 7, 2, 4, 6] }
 ---
+### Passing closure
+Void apply(Int->Void closure, Int t) {
+	closure.call(t);
+}
+Void main() {
+	var text = "printing ";
+	var printer = (Int i) -> Void { println(text ++ i); };
+	apply(printer, 3);
+}
+==>
+printing 3
+---
+### Passing closure with type params
+Void apply<@T>(@T->Void closure, @T t) {
+	closure.call(t);
+}
+Void main() {
+	var text = "printing ";
+	var printer = (Int i) -> Void { println(text ++ i); };
+	apply(printer, 3);
+}
+==>
+printing 3
+---
+### Mapper function
+Void main() {
+	var list = [1, 2, 3];
+	var mapper = (Int i) -> Int { return i*i; };
+	var printer = (Int i) -> Void { println(i); };
+	list | mapper | forAll(printer);
+}
+==>
+1
+4
+9
+---

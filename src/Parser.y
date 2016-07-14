@@ -1,6 +1,7 @@
 {
 module Parser where
 import Lexer
+import Util
 }
 
 %name parsePScript
@@ -330,7 +331,13 @@ data Datatype
 	| SumType [Datatype]
 	| Typeparam String
 	| DollarType
-	deriving Show
+
+instance Show Datatype where
+    show (Typename a []) = '#' : a
+    show (Typename a as) = '#' : a ++ "<" ++ joinComma (map show as) ++ ">"
+    show (SumType dts) = '#' : joinChar '&' (map show dts)
+    show DollarType = "#$"
+    show (Typeparam p) = "#@" ++ p
 
 data Statement
 	= Create String Expression

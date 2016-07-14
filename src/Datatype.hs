@@ -27,6 +27,10 @@ ifDollar PDollar t           = t
 ifDollar (PInterface n ts) t = PInterface n (map (`ifDollar` t) ts)
 ifDollar PNothing _          = PNothing
 
+isVarargsType :: PDatatype -> Bool
+isVarargsType (PInterface "Func" _) = True
+isVarargsType _                     = False
+
 -- Muuttaa tietotyypin PDatatype-olioksi
 
 dt2pdt :: Datatype -> PDatatype
