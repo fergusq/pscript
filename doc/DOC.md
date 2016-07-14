@@ -215,6 +215,23 @@ struct ArrayList<@T> {
 
 An array with mutable size. Supports `add` and `remove`-operations.
 
+#### The `Fold` structure
+
+```
+struct Fold<@T, @U> {
+	@U collection;
+	(@U, @T)->@U collector;
+}
+```
+
+#### The `Forall` structure
+
+```
+const struct Forall<@T> {
+	@T->Void callback;
+}
+```
+
 ### Standard enumerations
 
 #### The `Maybe` enumeration
