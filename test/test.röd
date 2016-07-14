@@ -12,10 +12,10 @@ function doTest(name, code, eout) {
 	{
 		print("module tmp;\nextern Void puts(Str s); Void println(String s) puts(s.toString());")
 		print(line) for line in code
-	} | writeLines("tmp.ps")
-	{} | exec("script/compile.sh", "tmp.ps") | {}
+	} | writeLines("tmp.pscript")
+	{} | exec("script/compile.sh", "tmp.pscript") | {}
 	if [ not fileExists("etmp") ] do
-		{} | exec("mv", "tmp.ps", "fail.ps") | {}
+		{} | exec("mv", "tmp.pscript", "fail.pscript") | {}
 		return new TestReport(name, FALSE, "Compiler error (try to compile manually)")
 	done
 	out := [{}() | exec(:l, "./etmp")]

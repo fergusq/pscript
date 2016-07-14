@@ -18,7 +18,7 @@ compileCode files = do
         c <- readFile file
         let lexemes = lexer 1 c
         let (ModuleDecl name imports decls) = parsePScript lexemes
-        return (map (++".ps") imports, decls)
+        return (map (++".pscript") imports, decls)
     let ((((((_, code0), code1), header0), header1), header2), errors) =
          runWriter $ runWriterT $ runWriterT $ runWriterT $ runWriterT $ runWriterT $ compile tree
     forM_ header2 putStr
