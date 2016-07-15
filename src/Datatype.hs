@@ -41,6 +41,7 @@ dt2pdt DollarType = PDollar
 pdt2dt :: PDatatype -> Datatype
 pdt2dt (PInterface name dts) = Typename name (map pdt2dt dts)
 pdt2dt (PSum dts) = SumType (map pdt2dt dts)
+pdt2dt PNothing = Typename "<#nothing>" []
 
 ctype :: PDatatype -> String -> String
 ctype (PInterface "Array" [a]) n = "struct _Array1" ++ pdt2str a ++ " " ++ n

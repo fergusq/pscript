@@ -10,7 +10,7 @@ record TestReport(test_name, status, message) {
 
 function doTest(name, code, eout) {
 	{
-		print("module tmp;\nextern Void puts(Str s); Void println(String s) puts(s.toString());")
+		print("module tmp;import stdlib;\nextern Void puts(Str s);Void println(String s)puts(s.toString());")
 		print(line) for line in code
 	} | writeLines("tmp.pscript")
 	compiler_errors := [{}() | exec(:l, "bash", "-c", "script/compile.sh tmp.pscript 2>&1")]

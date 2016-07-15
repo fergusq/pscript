@@ -219,6 +219,12 @@ getFields dt@(PInterface n _) = do
             return $ Just a
         Nothing -> return Nothing
 
+getFields PNothing = return Nothing
+
+getFields dt = do
+    tellError $ show dt ++ " does not have fields"
+    return Nothing
+
 isConstant :: PDatatype -> Compiler (Maybe Bool)
 isConstant dt@(PInterface n _) = do
     scope <- get

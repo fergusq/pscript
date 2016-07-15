@@ -1,5 +1,7 @@
 module test;
 
+import stdlib;
+
 extern Void printf(Str s, Int i);
 extern Void sprintf(Str to, Str format, Int i);
 extern Void puts(Str s);
