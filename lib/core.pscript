@@ -299,12 +299,40 @@ extend Array<@T> with Container<@T> {
 	}
 }
 
+// STACK
+
+model Stack<@T> {
+	Void push(@T value);
+	@T pop();
+}
+
+// QUEUE
+
+model Queue<@T> {
+	Void push(@T value);
+	@T pull();
+}
+
 // LIST
 
 model List<@T> : HasSize, Container<@T> {
-	@T operator [] (Int index);
-	Void operator []= (Int index, @T value);
-	Void add(@T value);
+	@T operator [](Int index);
+	Void operator []=(Int index, @T value);
+}
+
+extend Array<@T> with List<@T> {
+	@T operator [](Int index) {
+		return this.ptr[index];
+	}
+	Void operator []=(Int index, @T value) {
+		this.ptr[index] = value;
+	}
+}
+
+// VARIABLE-SIZE LIST
+
+model VariableSizeList<@T> : List<@T>, Stack<@T> {
+	Void add(Int index, @T value);
 	@T remove(Int index);
 }
 
@@ -348,8 +376,32 @@ extend ArrayList<@T> with List<@T> {
 	Void operator []=(Int index, @T value) {
 		this.elements[index] = value;
 	}
-	Void add(@T value) {
+}
+
+extend ArrayList<@T> with Stack<@T> {
+	Void push(@T value) {
 		this.elements = this.elements.append(value);
+	}
+	@T pop() {
+		return this.remove(this.size()-1);
+	}
+}
+
+extend ArrayList<@T> with VariableSizeList<@T> {
+	Void add(Int index, @T value) {
+		var arr = new @T[this.size()+1];
+		var i = 0;
+		for (v in this.elements) {
+			if (i < index)
+				arr[i] = v;
+			else if (i == index) {
+				arr[i] = value;
+				arr[i+1] = v;
+			} else if (i > index)
+				arr[i+1] = v;
+			i = i + 1;
+		}
+		this.elements = arr;
 	}
 	@T remove(Int index) {
 		var t = this[index];

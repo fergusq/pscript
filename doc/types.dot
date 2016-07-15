@@ -5,6 +5,9 @@ digraph G {
     HasSize [shape="oval"]
     Container [shape="oval", group="collections"]
     List [shape="oval", group="collections"]
+    VariableSizeList [shape="oval", group="collections"]
+    Stack [shape="oval", group="collections"]
+    Queue [shape="oval", group="collections"]
     Appendable [shape="oval", group="collections"]
     Summable [shape="oval", group="collections"]
     
@@ -13,69 +16,76 @@ digraph G {
     Iterator [shape="oval", group="iterators"]
     
     // Structs
-    //ArrayList [shape="hexagon", group="collections"]
-    //Array [shape="hexagon", group="collections"]
-    //ArrayIterator [shape="hexagon", group="iterators"]
-    //MappingIterator [shape="hexagon", group="iterators"]
-    //Forall [shape="hexagon", group="pipes"]
-    //Fold [shape="hexagon", group="pipes"]
+    /**/ArrayList [shape="hexagon", group="collections"]
+    /**/Array [shape="hexagon", group="collections"]
+    /**/ArrayIterator [shape="hexagon", group="iterators"]
+    /**/MappingIterator [shape="hexagon", group="iterators"]
+    /**/Forall [shape="hexagon", group="pipes"]
+    /**/Fold [shape="hexagon", group="pipes"]
     
     // Enums
-    //Maybe [shape="house", group="collections"]
+    /**/Maybe [shape="house", group="collections"]
     
     // Primitive types
-    //Str [shape="box", group="primitives"]
-    //Int [shape="box", group="primitives"]
-    //Bool [shape="box", group="primitives"]
-    //Char [shape="box", group="primitives"]
-    //Func [shape="box", group="primitives"]
+    /**/Str [shape="box", group="primitives"]
+    /**/Int [shape="box", group="primitives"]
+    /**/Bool [shape="box", group="primitives"]
+    /**/Char [shape="box", group="primitives"]
+    /**/Func [shape="box", group="primitives"]
     
-    //String -> Int
-    //String -> Bool
-    //String -> Str
-    //String -> Array
-    //String -> ArrayList
+    /**/String -> Int
+    /**/String -> Bool
+    /**/String -> Str
+    /**/String -> Array
+    /**/String -> ArrayList
     
-    //HasSize -> Str
+    /**/HasSize -> Str
     HasSize -> String
-    //HasSize -> Array
-    //HasSize -> ArrayList
+    //+HasSize -> Array
+    //+HasSize -> ArrayList
     
-    //Eq -> Str
+    /**/Eq -> Str
     Eq -> String
-    //Eq -> Array
-    //Eq -> ArrayList
-    //Eq -> Maybe
+    /**/Eq -> Array
+    /**/Eq -> ArrayList
+    /**/Eq -> Maybe
     
     StreamSource -> Container [style=dotted]
-    //Container -> Array
-    //Container -> ArrayList
-    //Container -> Maybe
+    //+Container -> Array
+    //+Container -> ArrayList
+    /**/Container -> Maybe
     
-    //List -> ArrayList
     HasSize -> List [style=dotted]
     Container -> List [style=dotted]
+    /**/List -> Array
+    //+List -> ArrayList
     
-    //StreamSource -> Maybe
-    //StreamSource -> Array
-    //StreamSource -> ArrayList
+    List -> VariableSizeList [style=dotted]
+    Stack -> VariableSizeList [style=dotted]
+    /**/VariableSizeList -> ArrayList
+    
+    //+Stack -> ArrayList
+    
+    //+StreamSource -> Maybe
+    //+StreamSource -> Array
+    //+StreamSource -> ArrayList
     StreamSource -> Iterator
-    //StreamSource -> ArrayIterator
-    //StreamSource -> MappingIterator
+    //+StreamSource -> ArrayIterator
+    //+StreamSource -> MappingIterator
     
-    //StreamOperation -> Func
-    //StreamOperation -> Fold
-    //StreamOperation -> Forall
+    /**/StreamOperation -> Func
+    /**/StreamOperation -> Fold
+    /**/StreamOperation -> Forall
     
-    //Summable -> Str
+    /**/Summable -> Str
     Summable -> String
-    //Summable -> Array
-    //Summable -> ArrayList
+    /**/Summable -> Array
+    /**/Summable -> ArrayList
     
-    //Appendable -> Array
-    //Appendable -> ArrayList
+    /**/Appendable -> Array
+    /**/Appendable -> ArrayList
     
     StreamSource -> Iterator [style=dotted]
-    //Iterator -> ArrayIterator
-    //Iterator -> MappingIterator
+    /**/Iterator -> ArrayIterator
+    /**/Iterator -> MappingIterator
 }

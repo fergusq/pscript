@@ -127,12 +127,16 @@ Void main() {
 Void main() {
 	var a = new ArrayList<Int> { [3, 2, 1] };
 	var b = new ArrayList<Int> { [2, 3, 4] }.append(6);
-	a.add(7);
+	a.push(7);
 	b[1] = b.remove(2);
 	println(a ++ b);
+	b.pop();
+	b.add(1, 9);
+	println(b);
 }
 ==>
 ArrayList { [3, 2, 1, 7, 2, 4, 6] }
+ArrayList { [2, 9, 4] }
 ---
 ### Passing closure
 Void apply(Int->Void closure, Int t) {

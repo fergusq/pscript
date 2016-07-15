@@ -28,7 +28,7 @@ function doTest(name, code, eout) {
 	for i in [seq(0,#eout-1)] do
 		if [ eout[i] != out[i] ] do
 			{} | exec("mv", "tmp.c", "fail.c") | {}
-			return new TestReport(name, FALSE, "expected `"..eout[i].."', got `"..out[i].."' (output line "..i..")")
+			return new TestReport(name, FALSE, "expected `"..eout[i].."', got `"..out[i].."' (output line "..i+1..")")
 		done
 	done
 	{} | exec("rm", "tmp.c") | {}
