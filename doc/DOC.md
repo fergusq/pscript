@@ -164,16 +164,33 @@ it basically says that it can't compile method `AddingPrinterImpl<Bool>.print` b
 
 ## Type system reference
 
-![A graph of standard types](https://github.com/fergusq/pscript/raw/master/doc/types.png "The standard types")
+![A graph of the standard types](https://github.com/fergusq/pscript/raw/master/doc/types.png "The standard types")
+
+PScript's type system is rather different than in more notable languages C++ or Java. All currently implemented types and
+their relations are presented in the graph above. Types in boxes are primitive built-in types. Types in hexagons are
+structures and types in ovals are models, all types of these king are declared in the standard library.
+
+There are two kinds of arrows. A solid black arrow means that type implements a model. The source of the arrow is said to
+be the _supertype_ and the destination of the arrow is the _subtype_. That is not inheritance, there is no
+inheritance in PScript. It is possible and common that a type implements a model but its subtypes do not, eg. String implements
+HasSize but Int does not.
+
+There are also dotted arrows. The source of the arrow is said to be a _prerequisite_ of the destination of the arrow.
+All subtypes of a type should and must implement all prerequisites of it. The type itself that has the prerequisite, however,
+does not need to implement it. A type must also implement the prerequisites of the prerequisites, so for example ArrayList
+implements Stack although it is not a prerequisite of VariableSizeList.
+
+Only the solid arrows that can not be inferred from prerequisites are drawn.
 
 ### Primitive datatypes
 
-* `Bool`. Either `True` or `False`.
+* `Bool`. Either `true` or `false`.
 * `Char`. Internally a 8-bit integer. Currently does not support any operators.
   The only use of this type is to define `Str`.
 * `Func<@R, @P...>`. Type of anonymous functions.
+  Has syntax sugar form `@P->@R` (for one parameter) or `(@P, @Q, ...) -> @R` (for many or none parameters).
 * `Int`. A 32-bit integer.
-* `Pointer<@T>`. A pointer to a list of values of type `@T`.
+* `Pointer<@T>`. A pointer to a list of values of type `@T`. Has syntax sugar form `@T*`.
 * `Str`. An alias for `Char*`.
 
 ### Standard structures
