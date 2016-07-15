@@ -170,15 +170,16 @@ PScript's type system is rather different than in more notable languages C++ or 
 their relations are presented in the graph above. Types in boxes are primitive built-in types. Types in hexagons are
 structures and types in ovals are models, all types of these king are declared in the standard library.
 
-There are two kinds of arrows. A solid black arrow means that type implements a model. The source of the arrow is said to
+A solid black arrow means that type implements a model. The source of the arrow is said to
 be the _supertype_ and the destination of the arrow is the _subtype_. That is not inheritance, there is no
 inheritance in PScript. It is possible and common that a type implements a model but its subtypes do not, eg. String implements
 HasSize but Int does not.
 
 There are also dotted arrows. The source of the arrow is said to be a _prerequisite_ of the destination of the arrow.
 All subtypes of a type should and must implement all prerequisites of it. The type itself that has the prerequisite, however,
-does not need to implement it. A type must also implement the prerequisites of the prerequisites, so for example ArrayList
-implements Stack although it is not a prerequisite of VariableSizeList.
+does not need to implement it. This is very common, in fact Iterator is the only type that implements its prerequisite StreamSource.
+A type must also implement the prerequisites of the prerequisites, so for example ArrayList implements Container although it is 
+not a direct prerequisite of VariableSizeList.
 
 Only the solid arrows that can not be inferred from prerequisites are drawn.
 
