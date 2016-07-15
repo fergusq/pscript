@@ -1,6 +1,6 @@
 module test;
 
-import stdlib;
+import core;
 
 extern Void printf(Str s, Int i);
 extern Void sprintf(Str to, Str format, Int i);

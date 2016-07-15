@@ -1,4 +1,4 @@
-module stdlib;
+module core;
 
 extern Int strcmp(Str a, Str b);
 extern Void strcpy(Str d, Str s);
