@@ -313,15 +313,26 @@ Implementing types: `ArrayIterator`
 #### The `List` model
 
 ```
-model List<@T> : Container<@T>, HasSize {
-	@T operator [] (Int index);
-	Void operator []= (Int index, @T value);
-	Void add(@T value);
-	@T remove(Int index);
+model List<@T> : HasSize, Container<@T> {
+	@T operator [](Int index);
+	Void operator []=(Int index, @T value);
 }
 ```
 
-Implementing typs: `ArrayList`
+Collections that appear as ordered sequences of finite size should implement this model.
+
+Implementing types: `Array`, `ArrayList`
+
+#### The `Stack` model
+
+```
+model Stack<@T> {
+	Void push(@T value);
+	@T pop();
+}
+```
+
+Implementing types: `ArrayList`
 
 #### The `StreamSource` model
 
@@ -376,3 +387,16 @@ All types that can be converted to `Str` should be implement this model.
 `String` can generally be used in place of `Str` to enable implicit type conversion.
 
 Implementing types: `Array`, `ArrayList`, `Bool`, `Int`, `Str`
+
+#### The `VariableSizedList` model
+
+```
+model VariableSizeList<@T> : List<@T>, Stack<@T> {
+	Void add(Int index, @T value);
+	@T remove(Int index);
+}
+```
+
+Collections that are lists and have variable size should implement this model.
+
+Implementing types: `ArrayList`
