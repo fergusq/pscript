@@ -43,6 +43,9 @@ rec2 f as = do
     bs' <- concat <$> forM as' (rec2 f)
     return (concat bs ++ bs')
 
+unlessM :: (Monad m) => m Bool -> m () -> m ()
+unlessM = (. flip unless) . (>>=)
+
 firstJust :: [Maybe a] -> Maybe a
 firstJust []           = Nothing
 firstJust (Just a:as)  = Just a

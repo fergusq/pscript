@@ -42,7 +42,8 @@ data VarScope = VarScope {
     variables :: Map.Map String PDatatype,
     expectedReturnType :: PDatatype,
     subs :: Subs,
-    doesReturn :: Bool
+    doesReturn :: Bool,
+    noWarnings :: Bool
 }
 
 putVar :: String -> PDatatype -> Compiler ()
@@ -290,9 +291,11 @@ tellError msg = do fname <- getCurrentFunctionName
                     tell [ErrorMsg EErr ("in " ++ fname) msg]
 
 tellWarning :: String -> Compiler ()
-tellWarning msg = do fname <- getCurrentFunctionName
-                     lift . lift . lift . lift . lift . lift $
-                        tell [ErrorMsg EWarn ("in " ++ fname) msg]
+tellWarning msg =
+    unlessM (noWarnings . varscope <$> get) $ do
+        fname <- getCurrentFunctionName
+        lift . lift . lift . lift . lift . lift $
+            tell [ErrorMsg EWarn ("in " ++ fname) msg]
 
 tellNote :: String -> Compiler ()
 tellNote msg = do fname <- getCurrentFunctionName

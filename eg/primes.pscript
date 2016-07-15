@@ -1,4 +1,6 @@
-model primes;
+module primes;
+
+import core;
 
 Void main() {	
 	var primes = new ArrayList<Int> { [2] };
@@ -10,9 +12,9 @@ Void main() {
 			if (i % prime == 0) isPrime = false;
 		}
 		if (isPrime) {
-			primes.add(i);
+			primes.push(i);
 			var t2 = clock();
-			println("" + i + "\t" + primes.size() + "\t" + (t2-t));
+			println("" ++ i ++ "\t" ++ primes.size() ++ "\t" ++ (t2-t));
 			t = t2;
 		}
 		i = i + 1;

@@ -366,6 +366,11 @@ compileDecl pvars (ss, Func decl@Function { name = fname, parameters = params,
 compileDecl pvars (ss, Func func) =
     when (null (funcTypeparameters func) || not (null ss)) $ do
         let fname = name func
+        -- käyttäjälle näytettävä nimi, jonka kääntäjä on liittänyt funktioon
+        let nameToBeShown = case lookup "_Alias" $ annotations func of
+                Just (n:_) -> n
+                _ -> fname -- ei tarvitse validoida, koska vain
+                           -- kääntäjä voi luoda annotaation
         -- substituoidaan parametreissa ja palautustyypeissä käytetyt tyyppiparametrit
         -- tyyppiargumenteilla
         params <- mapM (\(n,d) ->
@@ -374,15 +379,23 @@ compileDecl pvars (ss, Func func) =
         rtype <- substitute' (Just $ "return type of "++fname) ss $ returnType func
         -- varmistetaan, että tyyppien käyttämiseen tarvittavat c-structit luodaan
         forM_ (rtype:map snd params) $ \dt -> ensureStructIsDefined dt
+        -- tarkistetaan, onko SuppressWarning -annotaatiota
+        suppressWarnings <- case lookup "SuppressWarnings" $ annotations func of
+                Just [] -> return True
+                Just as  -> tellError ("wrong number of arguments for SuppressWarnings: "
+                            ++ "expected 0, got "++show (length as))
+                            >> return False
+                Nothing -> return False
         -- alustetaan scope
         scope <- get
         let vscope = varscope scope
         put scope { varscope = vscope {
-            functionName = fname,
+            functionName = nameToBeShown,
             variables = Map.fromList $ pvars ++ params,
             expectedReturnType = rtype,
             subs = ss,
-            doesReturn = False
+            doesReturn = False,
+            noWarnings = suppressWarnings
         }}
         -- varsinainen kääntäminen
         lift $ generateFunctionHeader rtype (map snd params) fname
@@ -395,7 +408,7 @@ compileDecl pvars (ss, Func func) =
 compileDecl _ (ss, Mdl m) =
     when (null $ typeparameters m) $ do
         let mname = modelName m
-        let dt = PInterface mname [] --TODO
+        let dt = PInterface mname []
         fs <- mapM (subsFunction Map.empty) $ methods m
         conditionallyCreateStruct (pdt2str dt) $
             compileStruct dt mname fs
@@ -438,7 +451,9 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                                            ", got " ++ show pdt)
                     queueDecl ss $ Func f {
                         name = '_' : pdt2str edt ++ "_" ++ name f,
-                        parameters = ("this", Typename n (map Typeparam tps)) : parameters f
+                        parameters = ("this", Typename n (map Typeparam tps)) : parameters f,
+                        annotations = ("_Alias", [show edt ++ '.' : name f])
+                            : annotations f
                     }
          )
 compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs,
@@ -872,7 +887,10 @@ compileExpression expdt (Lambda ps' rt' stmt) = do
         wn = fn ++ "_wrapper"
     -- lisätään varsinainen lambdafunktio jonoon
     ss <- getCurrentSubs
-    queueDecl ss $ Func $ Function fn [] (map (second pdt2dt) currentVariables++ps') rt' stmt
+    currentFName <- getCurrentFunctionName
+    queueDecl ss $ Func $
+        Function fn [] (map (second pdt2dt) currentVariables++ps') rt' stmt
+        [("_Alias", ["lambda:"++show num++" in "++currentFName])]
     -- tehdään structi kaapattavien muuttujien säilömiseen
     lift $ generateHeaderCode ("struct "++sn++" {\n")
     forM_ currentVariables $ \(n, dt) ->

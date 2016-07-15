@@ -321,9 +321,11 @@ model List<@T> : HasSize, Container<@T> {
 }
 
 extend Array<@T> with List<@T> {
+	[SuppressWarnings]
 	@T operator [](Int index) {
 		return this.ptr[index];
 	}
+	[SuppressWarnings]
 	Void operator []=(Int index, @T value) {
 		this.ptr[index] = value;
 	}

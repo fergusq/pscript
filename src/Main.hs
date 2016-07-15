@@ -84,7 +84,7 @@ main = do
     auddExists <- doesDirectoryExist appUserDataDir
     let defaultArgs = Map.fromList [
                 ("files", []),
-                ("path", if auddExists then [appUserDataDir] else [])
+                ("path", [appUserDataDir | auddExists])
             ]
     args <- flip parseArgs defaultArgs <$> getArgs
     let (Just files) = Map.lookup "files" args

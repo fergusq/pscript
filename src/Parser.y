@@ -103,18 +103,28 @@ Funcs	: Func Funcs			{ ($1 : $2) }
 EFuncs	: ExternFunc EFuncs		{ ($1 : $2) }
 	| ExternFunc			{ [$1] }
 
-Func	: Datatype var '(' Params ')' Stmt				{ Function $2 [] $4 $1 $6 }
-	| Datatype var '(' ')' Stmt					{ Function $2 [] [] $1 $5 }
-	| Datatype var '<' TParams '>' '(' Params ')' Stmt		{ Function $2 $4 $7 $1 $9 }
-	| Datatype var '<' TParams '>' '(' ')' Stmt			{ Function $2 $4 [] $1 $8 }
-	| Datatype operator Op1 '(' Parameter ')' Stmt			{ Function $3 [] [$5] $1 $7 }
-	| Datatype operator Op2 '(' Parameter ',' Parameter ')' Stmt	{ Function $3 [] [$5, $7] $1 $9 }
+Func	: AnnsRT var '(' Params ')' Stmt				{ Function $2 [] $4 (fst $1) $6 (snd $1) }
+	| AnnsRT var '(' ')' Stmt					{ Function $2 [] [] (fst $1) $5 (snd $1) }
+	| AnnsRT var '<' TParams '>' '(' Params ')' Stmt		{ Function $2 $4 $7 (fst $1) $9 (snd $1) }
+	| AnnsRT var '<' TParams '>' '(' ')' Stmt			{ Function $2 $4 [] (fst $1) $8 (snd $1) }
+	| AnnsRT operator Op1 '(' Parameter ')' Stmt			{ Function $3 [] [$5] (fst $1) $7 (snd $1) }
+	| AnnsRT operator Op2 '(' Parameter ',' Parameter ')' Stmt	{ Function $3 [] [$5, $7] (fst $1) $9 (snd $1) }
 
 ExternFunc
-	: Datatype var '(' Params ')' ';'				{ Function $2 [] $4 $1 Extern }
-	| Datatype var '(' ')' ';'					{ Function $2 [] [] $1 Extern }
-	| Datatype operator Op1 '(' Parameter ')' ';'			{ Function $3 [] [$5] $1 Extern }
-	| Datatype operator Op2 '(' Parameter ',' Parameter ')' ';'	{ Function $3 [] [$5, $7] $1 Extern }
+	: AnnsRT var '(' Params ')' ';'					{ Function $2 [] $4 (fst $1) Extern (snd $1) }
+	| AnnsRT var '(' ')' ';'					{ Function $2 [] [] (fst $1) Extern (snd $1) }
+	| AnnsRT operator Op1 '(' Parameter ')' ';'			{ Function $3 [] [$5] (fst $1) Extern (snd $1) }
+	| AnnsRT operator Op2 '(' Parameter ',' Parameter ')' ';'	{ Function $3 [] [$5, $7] (fst $1) Extern (snd $1) }
+
+AnnsRT	: Ann AnnsRT			{ (fst $2, $1 : snd $2) }
+	| Datatype			{ ($1, []) }
+
+Ann	: '[' var ']'			{ (,) $2 [] }
+	| '[' var '(' ')' ']'		{ (,) $2 [] }
+	| '[' var '(' AnnArgs ')' ']'	{ (,) $2 $4 }
+
+AnnArgs	: str ',' AnnArgs		{ ($1 : $3) }
+	| str				{ [$1] }
 
 Op1	: '[' ']'			{ "op_get" }
 	| plusplus			{ "op_append" }
@@ -289,42 +299,42 @@ data Declaration =
 	| Ext Extend
 	| Stc Struct
 	| Enm EnumStruct
-	deriving Show
 
 data Model = Model {
 	modelName :: String,
 	typeparameters :: [String],
 	prerequisites :: [Datatype],
 	methods :: [Function]
-} deriving Show
+}
 
 data Extend = Extend {
 	dtName :: String,
 	eTypeparameters :: [String],
 	model :: Datatype,
 	eMethods :: [Function]
-} deriving Show
+}
 
 data Struct = Struct {
 	stcName :: String,
 	stcTypeparameters :: [String],
 	stcFields :: [(String, Datatype)],
 	isConst :: Bool
-} deriving Show
+}
 
 data EnumStruct = EnumStruct {
 	enmName :: String,
 	enmTypeparameters :: [String],
 	enmCases :: [(String, [Datatype])]
-} deriving Show
+}
 
 data Function = Function {
 	name :: String,
 	funcTypeparameters :: [String],
 	parameters :: [(String,Datatype)],
 	returnType :: Datatype,
-	body :: Statement
-} deriving Show
+	body :: Statement,
+	annotations :: [(String, [String])]
+}
 
 data Datatype
 	= Typename String [Datatype]
@@ -350,11 +360,9 @@ data Statement
 	| Return Expression
 	| Match Expression [(MatchCondition, Statement)]
 	| Extern
-	deriving Show
 
 data MatchCondition
 	= MatchCond String [MatchCondition]
-	deriving Show
 
 data Expression
 	= MethodCall Expression String [Expression]
@@ -373,6 +381,5 @@ data Expression
 	| Cast Datatype Expression
 	| Lambda [(String,Datatype)] Datatype Statement
 	| TrueConstant | FalseConstant
-	deriving Show
 }
 
