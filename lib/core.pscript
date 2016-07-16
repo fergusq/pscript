@@ -244,6 +244,8 @@ extend Array<@T> with StreamSource<@T> {
 	}
 }
 
+// STREAM OPERATION
+
 model StreamOperation<@T, @U> {
 	@U operator |(StreamSource<@T> source);
 }
@@ -297,6 +299,8 @@ StreamOperation<@T, @U> appendTo<@T, @U>(@U collection) {
 StreamOperation<@T, @U> pushTo<@T, @U>(@U collection) {
 	return fold(collection, (@U u, @T t) -> @U { u.push(t); return u; });
 }
+
+// COLLECTOR
 
 model Collector<@T> {
 	StreamOperation<@T, $> collect();
@@ -490,6 +494,14 @@ extend ArrayList<@T> with StreamSource<@T> {
 	}
 }
 
+// OPTIONAL
+
+model Optional<@T> : Container<@T> {
+	@T orElse(@T value);
+	@T orElseGet(()->@T getter);
+	Bool isPresent();
+}
+
 // MAYBE
 
 enum Maybe<@T> {
@@ -533,5 +545,28 @@ extend Maybe<@T> with StreamSource<@T> {
 			Just(v) -> return new ArrayIterator<@T> { [v], 0 };
 		}
 		return new ArrayIterator<@T> { new @T[0], 0 };
+	}
+}
+
+extend Maybe<@T> with Optional<@T> {
+	@T orElse(@T value) {
+		match (this) {
+			Just(v) -> return v;
+		}
+		return value;
+	}
+	
+	@T orElseGet(()->@T getter) {
+		match (this) {
+			Just(v) -> return v;
+		}
+		return getter.call();
+	}
+	
+	Bool isPresent() {
+		match (this) {
+			Just(v) -> return true;
+		}
+		return false;
 	}
 }

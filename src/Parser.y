@@ -277,6 +277,7 @@ Prim	: int					{ Int $1 }
 	| '[' Args ']'				{ List $2 }
 	| '[' Exp dotdot Exp ']'		{ Range $2 $4 }
 	| '(' Params ')' arrow Datatype '{' Stmts '}'	{ Lambda $2 $5 $ Block $7 }
+	| '(' ')' arrow Datatype '{' Stmts '}'	{ Lambda [] $4 $ Block $6 }
 	| new Datatype '[' Exp ']'		{ NewList $2 $4 }
 	| new Datatype '{' Args '}'		{ NewStruct $2 $4 }
 	| new Datatype '{' '}'			{ NewStruct $2 [] }

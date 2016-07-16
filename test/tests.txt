@@ -93,6 +93,29 @@ Void main() {
 got: 3
 nothing
 ---
+### Maybe orElse
+Void main() {
+	var a = new Maybe<Str>::Just(6.toString());
+	println(a.orElse("nothing"));
+	var b = new Maybe<Str>::Nothing();
+	println(b.orElse("nothing"));
+}
+==>
+6
+nothing
+---
+### Maybe orElseGet
+Void main() {
+	var nothinger = () -> Str { return "nothing"; };
+	var a = new Maybe<Str>::Just(7.toString());
+	println(a.orElseGet(nothinger));
+	var b = new Maybe<Str>::Nothing();
+	println(b.orElseGet(nothinger));
+}
+==>
+7
+nothing
+---
 ### Function type parameters
 @T id<@T>(@T t) { return t; }
 Void main() {
