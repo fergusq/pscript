@@ -40,6 +40,23 @@ extend Array<@T> with Foo {
 // }
 ```
 
+A model can have prerequisites, which means that all types that are extended with the model must also be extended with the
+prerequisite. A model doesn't however need to implement its own prerequisites.
+
+```
+model Stack<@T> : Pushable<@T> {
+	@T pop();
+}
+```
+
+That means that in order to be a Stack, the type must first be a Pushable (i.e. support `push` operation) and then implement
+the `pop` method.
+
+Most models contain only one method. This allows great flexibility, but comes with a price:
+the standard library becomes very complicated (see picture at the middle of this page).
+
+The most feature-rich type, ArrayList, implements currently 12 different models.
+
 ### The dollar type
 
 `$` is a special type which can only be used inside model declarations. It corresponds to the type that implements the model and may be
@@ -155,12 +172,8 @@ boolPrinter.print(true);
 `Bool` does not have method `operator +`. The compiler will give the following error:
 
 ```
-[in _AddingPrinterImpl1Bool_print] error: type Bool does not have method `op_add'
+[in AddingPrinterImpl<Bool>.print] error: type Bool does not have method `op_add'
 ```
-
-It looks a bit complicated due to mangled names (they will be demangled in a later version), but
-it basically says that it can't compile method `AddingPrinterImpl<Bool>.print` because
-`Bool` does not have the required operator.
 
 ## Type system reference
 
