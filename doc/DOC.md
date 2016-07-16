@@ -177,7 +177,7 @@ boolPrinter.print(true);
 
 ## Type system reference
 
-![A graph of the standard types](https://github.com/fergusq/pscript/raw/master/doc/types.svg "The standard types")
+![A graph of the standard types](https://github.com/fergusq/pscript/raw/master/doc/types.png "The standard types")
 
 PScript's type system is rather different than in more notable languages C++ or Java. All currently implemented types and
 their relations are presented in the graph above. Types in boxes are primitive built-in types. Types in hexagons are
