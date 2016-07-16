@@ -289,8 +289,12 @@ ensureFunctionIsDefined :: [PDatatype] -> Function -> Compiler ()
 ensureFunctionIsDefined ts func = unless (null $ funcTypeparameters func) $ do
     let ss = Map.fromList $ zip (funcTypeparameters func) ts
     let n = name func ++ "_" ++ joinChar '_' (map pdt2str ts)
+    let displayName = name func ++ "<" ++ joinComma (map show ts) ++ ">"
     conditionallyCreateMethod n $
-        queueDecl ss $ Func func { name = n }
+        queueDecl ss $ Func func {
+            name = n,
+            annotations = ("_Alias", [displayName]) : annotations func
+        }
 
 -- Pääfunktio
 

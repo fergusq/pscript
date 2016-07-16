@@ -343,6 +343,18 @@ Collections that appear as ordered sequences of finite size should implement thi
 
 Implementing types: `Array`, `ArrayList`
 
+#### The `Optional` model
+
+```
+model Optional<@T> : Container<@T> {
+	@T orElse(@T value);
+	@T orElseGet(()->@T getter);
+	Bool isPresent();
+}
+```
+
+Implementing types: `Maybe`
+
 #### The `Pushable` model
 
 ```

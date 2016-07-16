@@ -67,6 +67,8 @@ pdt2str (PSum dts) = joinChar '_' (sort $ map pdt2str dts)
 pdt2str PNothing = "<nothing>"
 
 instance Show PDatatype where
+    show (PInterface "Array" [a]) = show a ++ "[]"
+    show (PInterface "Pointer" [a]) = show a ++ "*"
     show (PInterface a []) = a
     show (PInterface a as) = a ++ "<" ++ joinComma (map show as) ++ ">"
     show (PSum dts) = joinChar '&' (sort $ map show dts)
