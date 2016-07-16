@@ -217,8 +217,10 @@ MatchConds
 Stmts	: Stmt Stmts			{ ($1 : $2) }
 	| Stmt				{ [$1] }
 
-Call	: var '(' Args ')'		{ Call $1 $3 }
-	| var '(' ')'			{ Call $1 [] }
+Call	: var '(' Args ')'			{ Call $1 [] $3 }
+	| var '(' ')'				{ Call $1 [] [] }
+	| var field '<' DtList '>' '(' Args ')'	{ Call $1 $4 $7 }
+	| var field '<' DtList '>' '(' ')'	{ Call $1 $4 [] }
 	| Preprim '[' Exp ']'		{ MethodCall $1 "op_get" [$3] }
 	| Preprim '[' Exp ']' '=' Exp	{ MethodCall $1 "op_set" [$3, $6] }
 	| Preprim '.' var '(' Args ')'	{ MethodCall $1 $3 $5 }
@@ -371,7 +373,7 @@ data Expression
 	| Var String
 	| List [Expression]
 	| Range Expression Expression
-	| Call String [Expression]
+	| Call String [Datatype] [Expression]
 	| NewList Datatype Expression
 	| NewStruct Datatype [Expression]
 	| NewEnumStruct Datatype String [Expression]

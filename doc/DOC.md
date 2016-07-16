@@ -268,12 +268,22 @@ Represents a value that may or may not be present. Implements both `Container` a
 #### The `Appendable` model
 
 ```
-model Appendable<@T> {
+model Appendable<@T> : CopyCollector<@T> {
 	$ append(@T element);
 }
 ```
 
 Implementing types: `Array`, `ArrayList`.
+
+#### The `Collector` model
+
+```
+model Collector<@T> {
+	StreamOperation<@T, $> collect();
+}
+```
+
+Implementing types: `ArrayList`, `CopyCollector`
 
 #### The `Container` model
 
@@ -286,6 +296,16 @@ model Container<@T> : StreamSource<@T> {
 All collections that have finite size should implement this model.
 
 Implementing types: `Array`, `ArrayList`, `Maybe`.
+
+#### The `CopyCollector` model
+
+```
+model CopyCollector<@T> {
+	StreamOperation<@T, $> collectToCopy();
+}
+```
+
+Implementing types: `Array`, `ArrayList`
 
 #### The `HasSize` model
 
@@ -323,11 +343,20 @@ Collections that appear as ordered sequences of finite size should implement thi
 
 Implementing types: `Array`, `ArrayList`
 
+#### The `Pushable` model
+
+```
+model Pushable<@T> : Collector<@T> {
+	Void push(@T element);
+}
+```
+
+Implementing types: `ArrayList`
+
 #### The `Stack` model
 
 ```
-model Stack<@T> {
-	Void push(@T value);
+model Stack<@T> : Pushable<@T>{
 	@T pop();
 }
 ```

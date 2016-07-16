@@ -322,16 +322,17 @@ compile decls = do
     let enums = Map.fromList $ concatMap (\d -> case d of
                     Enm e -> [(enmName e, e)]
                     _     -> []) decls
-    generateHeaderCode "#include <stdlib.h>\n"
-    generateHeaderCode "#include <gc.h>\n"
-    generateHeaderCode "void * alloc(size_t x) { return GC_malloc(x); }\n"
+    generateSuperHeaderCode "#include <stdlib.h>\n"
+    generateSuperHeaderCode "#include <gc.h>\n"
+    generateSuperHeaderCode "void * alloc(size_t x) { return GC_malloc(x); }\n"
     let scope = Scope {
       varscope = VarScope {
         functionName = "",
         variables = Map.empty,
         expectedReturnType = PNothing,
         subs = Map.empty,
-        doesReturn = False
+        doesReturn = False,
+        noWarnings = False
       },
       counter = 0,
       functions = functions,
@@ -612,8 +613,8 @@ compileStatement (For name expr body)
                           generateAssign ctr (ctr ++ "+1")
                           restoreScope scope
                 _   -> typemismatch (pArray PNothing) dt
-compileStatement (Expr (Call name args)) = do
-    (_, code) <- compileCall pVoid name args
+compileStatement (Expr (Call name tas args)) = do
+    (_, code) <- compileCall pVoid name tas args
     lift $ generateCode (code ++ ";\n")
 compileStatement (Expr expr)
     = do (var, dt) <- compileExpression pVoid expr
@@ -667,7 +668,9 @@ compileMatchCase var dt mcond@(MatchCond caseName fieldMatches) = do
                 -- jos ei matchata enumia vastaan, muuttuja on ainoa mahdollinen match
                 return ("1", [(caseName, dt, var)])
 
-compileCall expdt name args = do
+compileCall expdt name tas' args = do
+    ss <- getCurrentSubs
+    tas <- mapM (substitute' (Just "function type arguments") ss) tas'
     f' <- getFunction name
     case f' of
         Just f -> let tps = funcTypeparameters f
@@ -678,7 +681,8 @@ compileCall expdt name args = do
                 let ps = map (dt2pdt.snd) $ parameters f
                 argcodes <- checkargs ps args
                 return (rt, name++"("++joinComma argcodes++")")
-            else do
+            else if null tas
+            then do
                 -- alustava inferointi odotetun tyypin perusteella
                 let rt' = returnType f
                 rtss <- Map.fromList <$> matchTypeArguments rt' expdt
@@ -721,6 +725,19 @@ compileCall expdt name args = do
 
                 return (rt, name++"_"++joinChar '_' (map pdt2str tas)
                         ++"("++joinComma argcodes++")")
+            else do
+                -- varmistetaan, että oikea versio funktiosta luodaan
+                ensureFunctionIsDefined tas f
+                -- substituoidaan tyyppiargumentit
+                let fss = Map.fromList $ zip tps tas
+                let rt' = returnType f
+                let ps' = map snd $ parameters f
+                rt <- substitute' (Just $ "return type of called " ++ name) fss rt'
+                ps <- mapM (substitute' (Just $ "parameter type of called " ++ name) fss) ps'
+
+                argcodes <- checkargs ps args
+                return (rt, name++"_"++joinChar '_' (map pdt2str tas)
+                        ++"("++joinComma argcodes++")")
         Nothing -> do
             tellError ("function not found: `" ++ name ++ "'")
             return (PNothing, "NOTHING")
@@ -757,8 +774,8 @@ compileExpression expdt (Str s) =
 compileExpression expdt (Var name)
     = do dt <- getVarOrError name
          return (name, dt)
-compileExpression expdt (Call name args) = do
-    (retType, code) <- compileCall expdt name args
+compileExpression expdt (Call name tas args) = do
+    (retType, code) <- compileCall expdt name tas args
     return (code, retType)
 compileExpression expdt (List (expr:exprs)) = do
     var <- tmpVar

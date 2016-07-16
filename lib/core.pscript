@@ -159,7 +159,7 @@ extend Array<@T> with HasSize {
 
 // APPENDABLE
 
-model Appendable<@T> {
+model Appendable<@T> : CopyCollector<@T> {
 	$ append(@T element);
 }
 
@@ -172,6 +172,12 @@ extend Array<@T> with Appendable<@T> {
 		newArray[this.len] = item;
 		return newArray;
 	}
+}
+
+// PUSHABLE
+
+model Pushable<@T> : Collector<@T> {
+	Void push(@T element);
 }
 
 // PIPES
@@ -284,6 +290,34 @@ StreamOperation<@T, @U> fold<@T, @U>(@U collection, (@U, @T)->@U collector) {
 	return new Fold<@T, @U> { collection, collector };
 }
 
+StreamOperation<@T, @U> appendTo<@T, @U>(@U collection) {
+	return fold(collection, (@U u, @T t) -> @U { return u.append(t); });
+}
+
+StreamOperation<@T, @U> pushTo<@T, @U>(@U collection) {
+	return fold(collection, (@U u, @T t) -> @U { u.push(t); return u; });
+}
+
+model Collector<@T> {
+	StreamOperation<@T, $> collect();
+}
+
+extend Array<@T> with CopyCollector<@T> {
+	StreamOperation<@T, Array<@T>> collectToCopy() {
+		return appendTo::<@T, Array<@T>>(this);
+	}
+}
+
+model CopyCollector<@T> {
+	StreamOperation<@T, $> collectToCopy();
+}
+
+extend CopyCollector<@T> with Collector<@T> {
+	StreamOperation<@T, $> collect() {
+		return this.collectToCopy();
+	}
+}
+
 // CONTAINER
 
 model Container<@T> : StreamSource<@T> {
@@ -301,15 +335,13 @@ extend Array<@T> with Container<@T> {
 
 // STACK
 
-model Stack<@T> {
-	Void push(@T value);
+model Stack<@T> : Pushable<@T> {
 	@T pop();
 }
 
 // QUEUE
 
-model Queue<@T> {
-	Void push(@T value);
+model Queue<@T> : Pushable<@T> {
 	@T pull();
 }
 
@@ -380,10 +412,13 @@ extend ArrayList<@T> with List<@T> {
 	}
 }
 
-extend ArrayList<@T> with Stack<@T> {
+extend ArrayList<@T> with Pushable<@T> {
 	Void push(@T value) {
 		this.elements = this.elements.append(value);
 	}
+}
+
+extend ArrayList<@T> with Stack<@T> {
 	@T pop() {
 		return this.remove(this.size()-1);
 	}
@@ -434,6 +469,18 @@ extend ArrayList<@T> with Summable<ArrayList<@T>> {
 extend ArrayList<@T> with Appendable<@T> {
 	ArrayList<@T> append(@T value) {
 		return new ArrayList<@T> { this.elements.append(value) };
+	}
+}
+
+extend ArrayList<@T> with CopyCollector<@T> {
+	StreamOperation<@T, ArrayList<@T>> collectToCopy() {
+		return appendTo::<@T, ArrayList<@T>>(this);
+	}
+}
+
+extend ArrayList<@T> with Collector<@T> {
+	StreamOperation<@T, ArrayList<@T>> collect() {
+		return pushTo::<@T, ArrayList<@T>>(this);
 	}
 }
 

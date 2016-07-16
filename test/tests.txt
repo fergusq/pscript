@@ -174,3 +174,31 @@ Void main() {
 4
 9
 ---
+### Mapper function and copy collector
+Void main() {
+	var list = [1, 2, 3];
+	var mapper = (Int i) -> Int { return i*i; };
+	var printer = (Int i) -> Void { println(i); };
+	var array = list | mapper | new Int[0].collectToCopy();
+	array[1] = 3;
+	array | forAll(printer);
+}
+==>
+1
+3
+9
+---
+### Mapper function and non-copy collector
+Void main() {
+	var list = [4, 3, 2];
+	var mapper = (Int i) -> Int { return i*i; };
+	var printer = (Int i) -> Void { println(i); };
+	var array = list | mapper | new ArrayList<Int> { new Int[0] }.collect();
+	array[1] = 8;
+	array | forAll(printer);
+}
+==>
+16
+8
+4
+---

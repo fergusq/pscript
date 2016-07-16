@@ -8,11 +8,14 @@ digraph G {
     VariableSizeList [shape="oval", group="collections"]
     Stack [shape="oval", group="collections"]
     Queue [shape="oval", group="collections"]
-    Appendable [shape="oval", group="collections"]
+    Appendable [shape="oval", group="collectors"]
+    Pushable [shape="oval", group="collectors"]
     Summable [shape="oval", group="collections"]
     
     StreamSource [shape="oval", group="pipes"]
     StreamOperation [shape="oval", group="pipes"]
+    Collector [shape="oval", group="collectors"]
+    CopyCollector [shape="oval", group="collectors"]
     Iterator [shape="oval", group="iterators"]
     
     // Structs
@@ -64,7 +67,10 @@ digraph G {
     Stack -> VariableSizeList [style=dotted]
     /**/VariableSizeList -> ArrayList
     
+    Pushable -> Stack [style=dotted]
     //+Stack -> ArrayList
+    
+    Pushable -> Queue [style=dotted]
     
     //+StreamSource -> Maybe
     //+StreamSource -> Array
@@ -82,8 +88,19 @@ digraph G {
     /**/Summable -> Array
     /**/Summable -> ArrayList
     
+    CopyCollector -> Appendable [style=dotted]
     /**/Appendable -> Array
     /**/Appendable -> ArrayList
+    
+    //+CopyCollector -> Array
+    //+CopyCollector -> ArrayList
+    CopyCollector -> Maybe
+    
+    Collector -> Pushable [style=dotted]
+    //+Pushable -> ArrayList
+    
+    //+Collector -> ArrayList
+    Collector -> CopyCollector
     
     StreamSource -> Iterator [style=dotted]
     /**/Iterator -> ArrayIterator
