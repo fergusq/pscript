@@ -947,7 +947,7 @@ compileExpression expdt TrueConstant = return ("1", pBool)
 compileExpression expdt FalseConstant = return ("0", pBool)
 compileExpression expdt (MethodCall obj method args)
     = do (objv, dt) <- compileExpression PNothing obj
-         compileMethodCall objv dt method args
+         compileMethodCall dt objv method args
 
 -- suorittaa annetun koodin, jos kenttä on olemassa
 ifFieldExists :: PDatatype -> String -> a -> (PDatatype -> Compiler a)
@@ -979,29 +979,44 @@ structField dt var field = do
 
 -- Sisäänrakennettujen tyyppien metodit
 
-type MethodCallCompiler = String
-                     -> PDatatype -> String -> [Expression]
+type MethodCallCompiler = PDatatype -> String
+                     -> String -> [Expression]
                      -> Compiler (String, PDatatype)
+
+compileIntLikeMethodCall :: MethodCallCompiler
+
+compileIntLikeMethodCall objdt obj method args
+    | method == "op_add" || method == "op_sub" || method == "op_mul" || method == "op_div"
+        || method == "op_mod"
+        = do (var:vars) <- checkargs [objdt] args
+             return ("("++obj++coperator method++var++")", objdt)
+    | method == "op_eq" || method == "op_neq" || method == "op_lt" || method == "op_gt"
+        || method == "op_le" || method == "op_ge"
+        = do (var:vars) <- checkargs [objdt] args
+             return ("("++obj++coperator method++var++")", pBool)
+    | method == "op_neg"
+        = do checkargs [] args
+             return ("-("++obj++")", objdt)
+    | otherwise
+        = compileOtherMethodCall objdt obj method args
 
 compileMethodCall :: MethodCallCompiler
 
 -- PInteger
-compileMethodCall obj (PInterface "Int" []) method args
-    | method == "op_add" || method == "op_sub" || method == "op_mul" || method == "op_div"
-        || method == "op_mod"
-        = do (var:vars) <- checkargs [pInteger] args
-             return ("("++obj++coperator method++var++")", pInteger)
-    | method == "op_eq" || method == "op_neq" || method == "op_lt" || method == "op_gt"
-        || method == "op_le" || method == "op_ge"
-        = do (var:vars) <- checkargs [pInteger] args
-             return ("("++obj++coperator method++var++")", pBool)
-    | method == "op_neg"
-        = do checkargs [] args
-             return ("-("++obj++")", pInteger)
+compileMethodCall dt@(PInterface "Int" []) obj method args
+    = compileIntLikeMethodCall dt obj method args
+
+-- PLong
+compileMethodCall dt@(PInterface "Long" []) obj method args
+    = compileIntLikeMethodCall dt obj method args
+
+-- PChar
+compileMethodCall dt@(PInterface "Char" []) obj method args
+    = compileIntLikeMethodCall dt obj method args
 
 -- PBool
-compileMethodCall obj (PInterface "Bool" []) method args
-    | method == "op_and" || method == "op_or"
+compileMethodCall (PInterface "Bool" []) obj method args
+    | method == "op_and" || method == "op_or" || method == "op_eq" || method == "op_neq"
         = do (var:vars) <- checkargs [pBool] args
              return ("("++obj++coperator method++var++")", pBool)
     | method == "op_not"
@@ -1009,7 +1024,7 @@ compileMethodCall obj (PInterface "Bool" []) method args
              return ("!("++obj++")", pBool)
 
 -- PArray
-compileMethodCall obj (PInterface "Array" [dt]) method args
+compileMethodCall (PInterface "Array" [dt]) obj method args
     | method == "op_get"
         = do (index:vars) <- checkargs [pInteger] args
              return (obj ++ ".ptr["++index++"]", dt)
@@ -1020,7 +1035,7 @@ compileMethodCall obj (PInterface "Array" [dt]) method args
              return (v, dt)
 
 -- PPointer
-compileMethodCall obj (PInterface "Pointer" [dt]) method args
+compileMethodCall (PInterface "Pointer" [dt]) obj method args
     | method == "op_get"
         = do (index:vars) <- checkargs [pInteger] args
              tellWarning "pointer arithmetic is not typesafe"
@@ -1033,14 +1048,14 @@ compileMethodCall obj (PInterface "Pointer" [dt]) method args
              return (v, dt)
 
 -- PPointer
-compileMethodCall obj dt@(PInterface "Func" (rt:ps)) method args
+compileMethodCall dt@(PInterface "Func" (rt:ps)) obj method args
     | method == "call"
         = do vars <- checkargs ps args
              objv <- createTmpVarIfNeeded dt obj
              return (objv ++ ".func("++joinComma ((objv++".scope"):vars)++")", rt)
 
 -- Määrittelemättömät metodit
-compileMethodCall obj dt@(PSum dts) method args
+compileMethodCall dt@(PSum dts) obj method args
     = do ms <- mapM (\dt -> do f <- getModelMethod dt method;
                                return $ do {f' <- f; return (dt, f') } ) dts
          let m = firstJust ms
@@ -1051,7 +1066,11 @@ compileMethodCall obj dt@(PSum dts) method args
             Just (dt', m') -> do
                 objv <- createTmpVarIfNeeded dt obj
                 compileMethodCall' m' (objv++"->"++method) objv dt args
-compileMethodCall obj dt method args
+compileMethodCall dt obj method args
+    = compileOtherMethodCall dt obj method args
+
+compileOtherMethodCall :: MethodCallCompiler
+compileOtherMethodCall dt obj method args
     = do m' <- getDTypeMethod dt method
          case m' of
             Nothing -> do

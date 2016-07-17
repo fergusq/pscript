@@ -85,6 +85,7 @@ Decl	: Func				{ Func $1 }
 	| Extend			{ Ext $1 }
 	| Struct			{ Stc $1 }
 	| Enum				{ Enm $1 }
+	| extern import str ';'		{ ExIm $3 }
 
 Model	: model var '{' EFuncs '}'				{ Model $2 [] [] $4 }
 	| model var '<' TParams '>' '{' EFuncs '}' 		{ Model $2 $4 [] $7 }
@@ -302,6 +303,7 @@ data Declaration =
 	| Ext Extend
 	| Stc Struct
 	| Enm EnumStruct
+	| ExIm String
 
 data Model = Model {
 	modelName :: String,

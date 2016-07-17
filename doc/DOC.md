@@ -310,6 +310,18 @@ All collections that have finite size should implement this model.
 
 Implementing types: `Array`, `ArrayList`, `Maybe`.
 
+#### The `Copyable` model
+
+```
+model Copyable {
+	$ copy();
+}
+```
+
+All mutable types that can be copied should implement this model.
+
+Implementing types: `Array`, `ArrayList`
+
 #### The `CopyCollector` model
 
 ```

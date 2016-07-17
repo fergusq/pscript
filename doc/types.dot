@@ -3,6 +3,7 @@ digraph G {
     // Models
     String [shape="oval"]
     HasSize [shape="oval"]
+    Copyable [shape="oval"]
     Container [shape="oval", group="collections"]
     Optional [shape="oval", group="collections"]
     List [shape="oval", group="collections"]
@@ -42,6 +43,9 @@ digraph G {
     /**/String -> Str
     /**/String -> Array
     /**/String -> ArrayList
+    
+    Copyable -> Array
+    Copyable -> ArrayList
     
     /**/HasSize -> Str
     HasSize -> String

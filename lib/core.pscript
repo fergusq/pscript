@@ -1,5 +1,7 @@
 module core;
 
+extern import "stdlib.h";
+
 extern Int strcmp(Str a, Str b);
 extern Void strcpy(Str d, Str s);
 extern Void strcat(Str d, Str s);
@@ -43,6 +45,10 @@ extend Array<@T> with String {
 		}
 		return str ++ "]";
 	}
+}
+
+Char[] stringToArray(String str) {
+	return new Array<Char> { str.size(), str.toString() as Char* }.copy();
 }
 
 // EQ
@@ -322,6 +328,22 @@ extend CopyCollector<@T> with Collector<@T> {
 	}
 }
 
+// COPYABLE
+
+model Copyable {
+	$ copy();
+}
+
+extend Array<@T> with Copyable {
+	@T[] copy() {
+		var newList = new @T[this.size()];
+		for (i in [0 .. this.size()-1]) {
+			newList[i] = this[i];
+		}
+		return newList;
+	}
+}
+
 // CONTAINER
 
 model Container<@T> : StreamSource<@T> {
@@ -491,6 +513,12 @@ extend ArrayList<@T> with Collector<@T> {
 extend ArrayList<@T> with StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return new ArrayIterator<@T> { this.elements, 0 };
+	}
+}
+
+extend ArrayList<@T> with Copyable {
+	ArrayList<@T> copy() {
+		return new ArrayList<@T> { this.elements.copy() };
 	}
 }
 
