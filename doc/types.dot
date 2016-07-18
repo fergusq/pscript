@@ -99,7 +99,6 @@ digraph G {
     
     //+CopyCollector -> Array
     //+CopyCollector -> ArrayList
-    /**/CopyCollector -> Maybe
     
     Collector -> Pushable [style=dotted]
     //+Pushable -> ArrayList

@@ -31,6 +31,8 @@ import Util
 	false		{ Token _ TokenFalse }
 	module		{ Token _ TokenModule }
 	import		{ Token _ TokenImport }
+	break		{ Token _ TokenBreak }
+	continue	{ Token _ TokenContinue }
 	int		{ Token _ (TokenInt $$) }
 	str		{ Token _ (TokenString $$) }
 	var		{ Token _ (TokenVarname $$) }
@@ -57,6 +59,7 @@ import Util
 	'|'		{ Token _ TokenPipe }
 	'%'		{ Token _ TokenPercent }
 	'!'		{ Token _ TokenEM }
+	'?'		{ Token _ TokenQM }
 	arrow		{ Token _ TokenArrow }
 	eq		{ Token _ TokenEqEq }
 	neq		{ Token _ TokenNeq }
@@ -180,6 +183,7 @@ Datatype: PrimDT			{ $1 }
 	| Datatype arrow Datatype	{ Typename "Func" [$3, $1] }
 	| '(' DtList ')' arrow Datatype	{ Typename "Func" ($5:$2) }
 	| '(' ')' arrow Datatype	{ Typename "Func" [$4] }
+	| Datatype '?'			{ Typename "Maybe" [$1] }
 
 SumDT	: PrimDT '&' SumDT		{ ($1 : $3) }
 	| PrimDT			{ [$1] }
@@ -202,6 +206,8 @@ Stmt	: Call ';'			{ Expr $1 }
 	| Pipe '|' Preprim ';'		{ Expr $ MethodCall $3 "op_pipe" [$1] }
 	| match '(' Exp ')' '{' Matches '}'	{ Match $3 $6 }
 	| match '(' Exp ')' '{' '}'	{ Match $3 [] }
+	| break ';'			{ Break }
+	| continue ';'			{ Continue }
 
 Matches	: MatchCase Matches		{ ($1 : $2) }
 	| MatchCase			{ [$1] }
@@ -364,6 +370,8 @@ data Statement
 	| While Expression Statement
 	| Return Expression
 	| Match Expression [(MatchCondition, Statement)]
+	| Break
+	| Continue
 	| Extern
 
 data MatchCondition

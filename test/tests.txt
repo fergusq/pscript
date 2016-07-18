@@ -225,3 +225,30 @@ Void main() {
 8
 4
 ---
+### Limit
+Void main() {
+	var list = [1 .. 100];
+	var printer = (Int i) -> Void { println(i); };
+	list | limit::<Int>(5) | forAll(printer);
+}
+==>
+1
+2
+3
+4
+5
+---
+### Filter
+Void main() {
+	var list = [1 .. 10];
+	var printer = (Int i) -> Void { println(i); };
+	var filterer = (Int i) -> Bool { return i%2==0; };
+	list | filter(filterer) | forAll(printer);
+}
+==>
+2
+4
+6
+8
+10
+---

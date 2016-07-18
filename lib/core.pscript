@@ -189,8 +189,7 @@ model Pushable<@T> : Collector<@T> {
 // PIPES
 
 model Iterator<@T> : StreamSource<@T> {
-	@T next();
-	Bool hasNext();
+	@T? next();
 }
 
 struct ArrayIterator<@T> {
@@ -199,12 +198,14 @@ struct ArrayIterator<@T> {
 }
 
 extend ArrayIterator<@T> with Iterator<@T> {
-	@T next() {
-		this.location = this.location + 1;
-		return this.elements[this.location - 1];
-	}
-	Bool hasNext() {
-		return this.location < this.elements.len;
+	@T? next() {
+		if (this.location < this.elements.len) {
+			this.location = this.location + 1;
+			return just(this.elements[this.location - 1]);
+		}
+		else {
+			return nothing();
+		}
 	}
 }
 
@@ -214,11 +215,46 @@ const struct MappingIterator<@From, @To> {
 }
 
 extend MappingIterator<@F, @T> with Iterator<@T> {
-	@T next() {
-		return this.mappingFunction.call(this.source.next());
+	@T? next() {
+		match (this.source.next()) {
+			Just(v) -> return just(this.mappingFunction.call(v));
+		}
+		return nothing();
 	}
-	Bool hasNext() {
-		return this.source.hasNext();
+}
+
+const struct FilteringIterator<@T> {
+	@T->Bool predicate;
+	Iterator<@T> source;
+}
+
+extend FilteringIterator<@T> with Iterator<@T> {
+	@T? next() {
+		while (true) {
+			match (this.source.next()) {
+				Just(item) -> {
+					if (this.predicate.call(item))
+						return just(item);
+				}
+				Nothing -> break;
+			}
+		}
+		return nothing();
+	}
+}
+
+struct LimitingIterator<@T> {
+	Int limit;
+	Iterator<@T> source;
+	Int position;
+}
+
+extend LimitingIterator<@T> with Iterator<@T> {
+	@T? next() {
+		if (this.position >= this.limit)
+			return nothing();
+		this.position = this.position + 1;
+		return this.source.next();
 	}
 }
 
@@ -244,6 +280,18 @@ extend MappingIterator<@F, @T> with StreamSource<@T> {
 	}
 }
 
+extend FilteringIterator<@T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		return this;
+	}
+}
+
+extend LimitingIterator<@T> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		return this;
+	}
+}
+
 extend Array<@T> with StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return new ArrayIterator<@T> { this, 0 };
@@ -262,6 +310,34 @@ extend Func<@R, @P> with StreamOperation<@P, StreamSource<@R>> {
 	}
 }
 
+const struct Filter<@T> {
+	@T->Bool predicate;
+}
+
+extend Filter<@T> with StreamOperation<@T, StreamSource<@T>> {
+	StreamSource<@T> operator |(StreamSource<@T> source) {
+		return new FilteringIterator<@T> { this.predicate, source.iterator() };
+	}
+}
+
+StreamOperation<@T, StreamSource<@T>> filter<@T>(@T->Bool predicate) {
+	return new Filter<@T> { predicate };
+}
+
+const struct Limit<@T> {
+	Int limit;
+}
+
+extend Limit<@T> with StreamOperation<@T, StreamSource<@T>> {
+	StreamSource<@T> operator |(StreamSource<@T> source) {
+		return new LimitingIterator<@T> { this.limit, source.iterator(), 0 };
+	}
+}
+
+StreamOperation<@T, StreamSource<@T>> limit<@T>(Int number) {
+	return new Limit<@T> { number };
+}
+
 const struct Forall<@T> {
 	@T->Void callback;
 }
@@ -269,8 +345,11 @@ const struct Forall<@T> {
 extend Forall<@T> with StreamOperation<@T, Void> {
 	Void operator |(StreamSource<@T> source) {
 		var i = source.iterator();
-		while (i.hasNext()) {
-			this.callback.call(i.next());
+		while (true) {
+			match (i.next()) {
+				Just(v) -> this.callback.call(v);
+				Nothing -> break;
+			}
 		}
 	}
 }
@@ -287,8 +366,11 @@ struct Fold<@T, @U> {
 extend Fold<@T, @U> with StreamOperation<@T, @U> {
 	@U operator |(StreamSource<@T> source) {
 		var i = source.iterator();
-		while (i.hasNext()) {
-			this.collection = this.collector.call(this.collection, i.next());
+		while (true) {
+			match (i.next()) {
+				Just(v) -> this.collection = this.collector.call(this.collection, v);
+				Nothing -> break;
+			}
 		}
 		return this.collection;
 	}
@@ -539,6 +621,10 @@ enum Maybe<@T> {
 
 Maybe<@T> just<@T>(@T value) {
 	return new Maybe<@T>::Just(value);
+}
+
+Maybe<@T> nothing<@T>() {
+	return new Maybe<@T>::Nothing();
 }
 
 extend Maybe<@T> with Eq<Maybe<@T>> {

@@ -39,6 +39,14 @@ generateWhile cond callback = do
     callback
     generateEnd
 
+generateBreak :: Compiler ()
+generateBreak =
+    lift $ tell ["break;\n"]
+
+generateContinue :: Compiler ()
+generateContinue =
+    lift $ tell ["continue;\n"]
+
 generateElse :: Compiler  ()
 generateElse
     = lift $ tell ["\t}else{\n"]
@@ -187,7 +195,7 @@ checkargs paramTs args = if length paramTs /= length args
                                               ++ show (length args))
                                     return []
                             else forM (zip paramTs args)
-                                  (\(t,v) -> compileExpressionAs t v)
+                                  (uncurry compileExpressionAs)
 
 -- luo tarvittaessa uuden väliaikaismuuttujan, jotta sivuvaikutuksellist arvoa ei
 -- suoritettaisi kahdesti
@@ -352,7 +360,7 @@ compile decls = do
     }
     runStateT (do -- TODO siisti tämä
         rec (\ds -> do
-            mapM_ (compileDecl []) ds
+            mapM_ compileDecl ds
             s@Scope { declarationQueue = q } <- get
             put s { declarationQueue = [] }
             return [q]) $ map (\a -> (Map.empty, a)) decls
@@ -363,12 +371,14 @@ compile decls = do
 
 -- Kääntää yksittäisen funktion
 
-compileDecl :: [PVariable] -> (Subs, Declaration)
+compileDecl :: (Subs, Declaration)
                -> Compiler ()
-compileDecl pvars (ss, Func decl@Function { name = fname, parameters = params,
+compileDecl (ss, ExIm str) =
+    lift $ generateSuperSuperHeaderCode ("#include <" ++ str ++ ">\n")
+compileDecl (ss, Func decl@Function { name = fname, parameters = params,
                                             returnType=rtype, body = Extern })
-    = lift $ generateExternFunctionHeader (dt2pdt rtype) [] fname
-compileDecl pvars (ss, Func func) =
+    = return () -- funktio pitäisi includoida extern import -komennolla
+compileDecl (ss, Func func) =
     when (null (funcTypeparameters func) || not (null ss)) $ do
         let fname = name func
         -- käyttäjälle näytettävä nimi, jonka kääntäjä on liittänyt funktioon
@@ -396,7 +406,7 @@ compileDecl pvars (ss, Func func) =
         let vscope = varscope scope
         put scope { varscope = vscope {
             functionName = nameToBeShown,
-            variables = Map.fromList $ pvars ++ params,
+            variables = Map.fromList params,
             expectedReturnType = rtype,
             subs = ss,
             doesReturn = False,
@@ -410,14 +420,14 @@ compileDecl pvars (ss, Func func) =
         when (rtype /= pVoid && not returns) $
             tellError "function does not return a value"
         generateEnd
-compileDecl _ (ss, Mdl m) =
+compileDecl (ss, Mdl m) =
     when (null $ typeparameters m) $ do
         let mname = modelName m
         let dt = PInterface mname []
         fs <- mapM (subsFunction Map.empty) $ methods m
         conditionallyCreateStruct (pdt2str dt) $
             compileStruct dt mname fs
-compileDecl _ (ss, Ext Extend { dtName = n, model = m,
+compileDecl (ss, Ext Extend { dtName = n, model = m,
                                 eMethods = fs, eTypeparameters = tps}) =
     when (null tps || not (null ss)) $ do
         dt <- substitute' (Just $ "extension declaration "++n++" with "++show m) ss m
@@ -461,7 +471,7 @@ compileDecl _ (ss, Ext Extend { dtName = n, model = m,
                             : annotations f
                     }
          )
-compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs,
+compileDecl (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs,
                                 isConst = c }) =
     when (null tps || not (null ss)) $ do
         etas <- substituteTpList n ss tps
@@ -473,7 +483,7 @@ compileDecl _ (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields 
             ftype' <- substitute' (Just $ "struct field "++show ftype++" "++fname) ss ftype
             lift $ generateSuperHeaderCode ("\t" ++ ctype ftype' fname ++ ";\n")
         lift $ generateSuperHeaderCode "};\n"
-compileDecl _ (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
+compileDecl (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
                                     enmCases = cs }) =
     when (null tps || not (null ss)) $ do
         etas <- substituteTpList n ss tps
@@ -603,6 +613,10 @@ compileStatement (While expr body) =
         scope <- saveScope
         compileStatement body
         restoreScope scope
+compileStatement Break =
+    generateBreak
+compileStatement Continue =
+    generateContinue
 compileStatement (For name expr body)
     = do (var, dt) <- compileExpression (pArray PNothing) expr
          ctr <- tmpVar
@@ -884,8 +898,10 @@ compileExpression expdt (FieldSet obj field val) = do
         valv <- createTmpVarIfNeeded dt2 valcode
         var3 <- tmpVar
         checktype var3 valv t dt2
-        fieldcode <- structField dt var field
-        generateAssign fieldcode var3
+        (Just constant) <- isConstant dt
+        when constant $
+            tellError ("trying to modify a const struct "++show dt)
+        generateAssign (var++"->"++field) var3
         return (valv, dt2)
 compileExpression expdt (Cast dt expr) = do
     ss <- getCurrentSubs
@@ -1022,6 +1038,15 @@ compileMethodCall (PInterface "Bool" []) obj method args
     | method == "op_not"
         = do checkargs [] args
              return ("!("++obj++")", pBool)
+
+-- PVoid
+compileMethodCall (PInterface "Void" []) obj method args
+    | method == "op_eq"
+        = do (var:vars) <- checkargs [pVoid] args
+             return ("1", pBool)
+    | method == "op_neq"
+        = do (var:vars) <- checkargs [pVoid] args
+             return ("0", pBool)
 
 -- PArray
 compileMethodCall (PInterface "Array" [dt]) obj method args

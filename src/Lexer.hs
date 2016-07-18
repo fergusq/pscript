@@ -25,6 +25,8 @@ data TokenClass
 	| TokenFalse
 	| TokenModule
 	| TokenImport
+	| TokenBreak
+	| TokenContinue
 	| TokenSub
 	| TokenSuper
 	| TokenInt Int
@@ -62,6 +64,7 @@ data TokenClass
 	| TokenField
 	| TokenPercent
 	| TokenEM
+	| TokenQM
 	| TokenPlusPlus
 	deriving Show
 
@@ -102,6 +105,7 @@ lexer ln (':':':':cs) = Token ln TokenField : lexer ln cs
 lexer ln (':':cs) = Token ln TokenColon : lexer ln cs
 lexer ln ('%':cs) = Token ln TokenPercent : lexer ln cs
 lexer ln ('!':cs) = Token ln TokenEM : lexer ln cs
+lexer ln ('?':cs) = Token ln TokenQM : lexer ln cs
 lexer ln ('"':cs) = lexString ln "" cs
 lexer ln ('\n':cs) = lexer (ln+1) cs
 lexer ln (c:cs)
@@ -156,4 +160,6 @@ lexVar ln cs =
 		("false",rest)   -> Token ln TokenFalse : lexer ln rest
 		("module",rest)  -> Token ln TokenModule : lexer ln rest
 		("import",rest)  -> Token ln TokenImport : lexer ln rest
+		("break",rest)  -> Token ln TokenBreak : lexer ln rest
+		("continue",rest)  -> Token ln TokenContinue : lexer ln rest
 		(var,rest)       -> Token ln (TokenVarname var) : lexer ln rest
