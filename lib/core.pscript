@@ -27,6 +27,14 @@ extend Int with String {
 	}
 }
 
+extend Char with String {
+	Str toString() {
+		var str = new Char*(2);
+		str[0] = this;
+		return str;
+	}
+}
+
 extend Bool with String {
 	Str toString() {
 		if (this) return "true";
@@ -58,21 +66,21 @@ model Eq<@T> {
 	Bool operator !=(@T t);
 }
 
-extend Str with Eq<String> {
-	Bool operator ==(String t) {
-		return strcmp(this, t.toString()) == 0;
+extend Str with Eq<Str> {
+	Bool operator ==(Str t) {
+		return strcmp(this, t) == 0;
 	}
-	Bool operator !=(String t) {
-		return strcmp(this, t.toString()) != 0;
+	Bool operator !=(Str t) {
+		return strcmp(this, t) != 0;
 	}
 }
 
 extend String with Eq<String> {
 	Bool operator ==(String t) {
-		return this.toString() == t;
+		return this.toString() == t.toString();
 	}
 	Bool operator !=(String t) {
-		return this.toString() != t;
+		return this.toString() != t.toString();
 	}
 }
 
@@ -167,6 +175,12 @@ extend Array<@T> with HasSize {
 
 model Appendable<@T> : CopyCollector<@T> {
 	$ append(@T element);
+}
+
+extend Str with Appendable<Char> {
+	Str append(Char chr) {
+		return this ++ chr;
+	}
 }
 
 extend Array<@T> with Appendable<@T> {
@@ -268,6 +282,12 @@ extend Iterator<@T> with StreamSource<@T> {
 	}
 }
 
+//forall $ : Iterator<@T> extend $ with StreamSource<@T> {
+//	Iterator<@T> iterator() {
+//		return this;
+//	}
+//}
+
 extend ArrayIterator<@T> with StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return this;
@@ -295,6 +315,12 @@ extend LimitingIterator<@T> with StreamSource<@T> {
 extend Array<@T> with StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return new ArrayIterator<@T> { this, 0 };
+	}
+}
+
+extend Str with StreamSource<Char> {
+	Iterator<Char> iterator() {
+		return stringToArray(this).iterator();
 	}
 }
 
@@ -394,6 +420,12 @@ model Collector<@T> {
 	StreamOperation<@T, $> collect();
 }
 
+extend Str with CopyCollector<Char> {
+	StreamOperation<Char, Str> collectToCopy() {
+		return appendTo::<Char, Str>(this);
+	}
+}
+
 extend Array<@T> with CopyCollector<@T> {
 	StreamOperation<@T, Array<@T>> collectToCopy() {
 		return appendTo::<@T, Array<@T>>(this);
@@ -428,8 +460,16 @@ extend Array<@T> with Copyable {
 
 // CONTAINER
 
-model Container<@T> : StreamSource<@T> {
+model Container<@T> : Eq<$>, StreamSource<@T> {
 	Bool contains(@T value);
+}
+
+extend Str with Container<Char> {
+	Bool contains(Char value) {
+		return this | fold(false, (Bool contains, Char chr) -> Bool {
+			return contains || chr == value;
+		});
+	}
 }
 
 extend Array<@T> with Container<@T> {
@@ -457,6 +497,16 @@ model Queue<@T> : Pushable<@T> {
 
 model List<@T> : HasSize, Container<@T> {
 	@T operator [](Int index);
+}
+
+extend Str with List<Char> {
+	[SuppressWarnings]
+	Char operator [](Int index) {
+		return (this as Char*)[index];
+	}
+}
+
+model MutableList<@T> : List<@T> {
 	Void operator []=(Int index, @T value);
 }
 
@@ -465,6 +515,9 @@ extend Array<@T> with List<@T> {
 	@T operator [](Int index) {
 		return this.ptr[index];
 	}
+}
+
+extend Array<@T> with MutableList<@T> {
 	[SuppressWarnings]
 	Void operator []=(Int index, @T value) {
 		this.ptr[index] = value;
@@ -473,7 +526,7 @@ extend Array<@T> with List<@T> {
 
 // VARIABLE-SIZE LIST
 
-model VariableSizeList<@T> : List<@T>, Stack<@T> {
+model VariableSizeList<@T> : List<@T>, Stack<@T>, Queue<@T> {
 	Void add(Int index, @T value);
 	@T remove(Int index);
 }
@@ -515,6 +568,9 @@ extend ArrayList<@T> with List<@T> {
 	@T operator [](Int index) {
 		return this.elements[index];
 	}
+}
+
+extend ArrayList<@T> with MutableList<@T> {
 	Void operator []=(Int index, @T value) {
 		this.elements[index] = value;
 	}
@@ -529,6 +585,12 @@ extend ArrayList<@T> with Pushable<@T> {
 extend ArrayList<@T> with Stack<@T> {
 	@T pop() {
 		return this.remove(this.size()-1);
+	}
+}
+
+extend ArrayList<@T> with Queue<@T> {
+	@T pull() {
+		return this.remove(0);
 	}
 }
 

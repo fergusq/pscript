@@ -252,3 +252,18 @@ Void main() {
 8
 10
 ---
+### Str as List
+Void main() {
+	var str = "eager evaluation";
+	println(str.contains("x"[0]));
+	println(str.contains("e"[0]));
+	var newStr = str | (Char chr) -> Char {
+		return ("A"[0]-"a"[0])+chr;
+	} | limit::<Char>(5) | "not ".collectToCopy();
+	println(newStr);
+}
+==>
+false
+true
+not EAGER
+---

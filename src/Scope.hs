@@ -143,7 +143,8 @@ getPrerequisites dt@(PInterface a _) = do
     scope <- get
     ss <- getSubstitutions dt
     case Map.lookup a $ models scope of
-            Just m -> mapM (substitute' (Just $ "prerequisite of "++show dt) ss) $
+            Just m ->
+                mapM (substitute' (Just $ "prerequisite of "++show dt) ss) $
                 prerequisites m
             Nothing -> return []
 

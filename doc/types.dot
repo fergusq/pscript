@@ -7,6 +7,7 @@ digraph G {
     Container [shape="oval", group="collections"]
     Optional [shape="oval", group="collections"]
     List [shape="oval", group="collections"]
+    MutableList [shape="oval", group="collections"]
     VariableSizeList [shape="oval", group="collections"]
     Stack [shape="oval", group="collections"]
     Queue [shape="oval", group="collections"]
@@ -23,10 +24,9 @@ digraph G {
     // Structs
     /**/ArrayList [shape="hexagon", group="collections"]
     /**/Array [shape="hexagon", group="collections"]
-    /**/ArrayIterator [shape="hexagon", group="iterators"]
-    /**/MappingIterator [shape="hexagon", group="iterators"]
-    /**/Forall [shape="hexagon", group="pipes"]
-    /**/Fold [shape="hexagon", group="pipes"]
+    /**/PipeIterator [label="FilteringIterator\nLimitingIterator\nMappingIterator", shape="hexagon", group="iterators"]
+    /**/PipeOp [label="Filter\nLimit", shape="hexagon", group="pipes"]
+    /**/PipeEnd [label="Fold\nForall", shape="hexagon", group="pipes"]
     
     // Enums
     /**/Maybe [shape="house", group="collections"]
@@ -39,25 +39,27 @@ digraph G {
     /**/Func [shape="box", group="primitives"]
     
     /**/String -> Int
+    /**/String -> Char
     /**/String -> Bool
     /**/String -> Str
     /**/String -> Array
     /**/String -> ArrayList
     
-    Copyable -> Array
-    Copyable -> ArrayList
+    /**/Copyable -> Array
+    /**/Copyable -> ArrayList
     
-    /**/HasSize -> Str
+    //+HasSize -> Str
     HasSize -> String
     //+HasSize -> Array
     //+HasSize -> ArrayList
     
-    /**/Eq -> Str
+    //+Eq -> Str
     Eq -> String
-    /**/Eq -> Array
-    /**/Eq -> ArrayList
-    /**/Eq -> Maybe
+    //+Eq -> Array
+    //+Eq -> ArrayList
+    //+Eq -> Maybe
     
+    Eq -> Container [style=dotted]
     StreamSource -> Container [style=dotted]
     //+Container -> Array
     //+Container -> ArrayList
@@ -65,11 +67,15 @@ digraph G {
     
     HasSize -> List [style=dotted]
     Container -> List [style=dotted]
-    /**/List -> Array
-    //+List -> ArrayList
+    /**/List -> Str
+    
+    List -> MutableList [style=dotted]
+    /**/MutableList -> Array
+    /**/MutableList -> ArrayList
     
     List -> VariableSizeList [style=dotted]
     Stack -> VariableSizeList [style=dotted]
+    Queue -> VariableSizeList [style=dotted]
     /**/VariableSizeList -> ArrayList
     
     Pushable -> Stack [style=dotted]
@@ -85,8 +91,8 @@ digraph G {
     //+StreamSource -> MappingIterator
     
     /**/StreamOperation -> Func
-    /**/StreamOperation -> Fold
-    /**/StreamOperation -> Forall
+    /**/StreamOperation -> PipeOp
+    /**/StreamOperation -> PipeEnd
     
     /**/Summable -> Str
     Summable -> String
@@ -107,8 +113,7 @@ digraph G {
     Collector -> CopyCollector
     
     StreamSource -> Iterator [style=dotted]
-    /**/Iterator -> ArrayIterator
-    /**/Iterator -> MappingIterator
+    /**/Iterator -> PipeIterator
     
     Container -> Optional [style=dotted]
     /**/Optional -> Maybe

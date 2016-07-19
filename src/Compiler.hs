@@ -433,7 +433,7 @@ compileDecl (ss, Ext Extend { dtName = n, model = m,
         dt <- substitute' (Just $ "extension declaration "++n++" with "++show m) ss m
         etas <- substituteTpList ("extend " ++ n) ss tps
         let edt = PInterface n etas
-        prs <- getPrerequisites dt
+        prs <- map (`ifDollar` edt) <$> getPrerequisites dt
         es <- getSubstitutedExtends edt
         forM_ prs $ \prt ->
             unless (prt `elem` es) $
