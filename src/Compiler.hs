@@ -306,34 +306,38 @@ ensureFunctionIsDefined ts func = unless (null $ funcTypeparameters func) $ do
 
 -- Pääfunktio
 
-compile :: [Declaration] -> Generator ()
-compile decls = do
+treeToLists decls =
     let functions = Map.fromList $
                 concatMap (\d -> case d of
                     Func f -> [(name f, f)]
                     _      -> []) decls
-    let models = Map.fromList $
+        models = Map.fromList $
                 concatMap (\d -> case d of
                     Mdl m -> [(modelName m, m)]
                     _     -> []) decls
-    let extends = concatMap (\d -> case d of
+        extends = concatMap (\d -> case d of
                     Ext e -> [(dtName e, e)]
                     _     -> []) decls
-    let supers = collapse extends
+        supers = collapse extends
 
-    let listStruct = Struct "Array" ["T"] [
+        listStruct = Struct "Array" ["T"] [
             ("len", Typename "Int" []),
             ("ptr", Typename "Pointer" [Typeparam "T"])
             ] True
 
-    let structs = Map.fromList $ ("Array", listStruct) :
+        structs = Map.fromList $ ("Array", listStruct) :
                 concatMap (\d -> case d of
                     Stc s -> [(stcName s, s)]
                     _     -> []) decls
 
-    let enums = Map.fromList $ concatMap (\d -> case d of
+        enums = Map.fromList $ concatMap (\d -> case d of
                     Enm e -> [(enmName e, e)]
                     _     -> []) decls
+    in (functions, models, supers, structs, enums)
+
+compile :: [Declaration] -> Generator ()
+compile decls = do
+    let (functions, models, supers, structs, enums) = treeToLists decls
     generateSuperHeaderCode "#include <stdlib.h>\n"
     generateSuperHeaderCode "#include <gc.h>\n"
     generateSuperHeaderCode "void * alloc(size_t x) { return GC_malloc(x); }\n"

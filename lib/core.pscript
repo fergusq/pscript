@@ -9,7 +9,9 @@ extern Void sprintf(Str d, Str f, Int i);
 
 // STRING
 
+[doc("All types that have a string representation should implement this model.")]
 model String {
+	[doc("Returns the string representation of the value.")]
 	Str toString();
 }
 
@@ -55,12 +57,14 @@ extend Array<@T> with String {
 	}
 }
 
+[doc("Converts values of type String to values of type Char[].")]
 Char[] stringToArray(String str) {
 	return new Array<Char> { str.size(), str.toString() as Char* }.copy();
 }
 
 // EQ
 
+[doc("Note: <tt>@T</tt> should be <tt>$</tt>.")]
 model Eq<@T> {
 	Bool operator ==(@T t);
 	Bool operator !=(@T t);
@@ -99,7 +103,19 @@ extend Array<@T> with Eq<Array<@T>> {
 
 // SUMMABLE
 
+[doc("If all instances of a type
+<ol>
+<li>are collections,</li>
+<li>have finite but unlimited size,</li>
+<li>contain only existing values,</li>
+<li>can contain values in any arbitrary combinations and</li>
+<li>new arbitrary instances can be easily created,</li>
+</ol>
+then the type should implement this model.
+
+<tt>@T</tt> should be either <tt>$</tt> or a generalization of <tt>$</tt>.")]
 model Summable<@T> {
+	[doc("Returns the union of two collections. This method does not modify <tt>this</tt> or <tt>t</tt>.")]
 	$ operator ++(@T t);
 	@T sumIdentity();
 }
@@ -149,7 +165,14 @@ extend Array<@T> with Summable<Array<@T>> {
 
 extern Int strlen(Str s);
 
+[doc("If all instances of a type
+<ol>
+<li>are collections and</li>
+<li>have finite but unlimited size,</li>
+</ol>
+then the type should implement this model.")]
 model HasSize {
+	[doc("Returns the size of the collection.")]
 	Int size();
 }
 
@@ -173,8 +196,17 @@ extend Array<@T> with HasSize {
 
 // APPENDABLE
 
+[doc("If all instances of a type
+<ol>
+<li>are collections of type <tt>@T</tt>,</li>
+<li>can contain any instance of <tt>@T</tt>,</li>
+<li>can contain values in any arbitrary combinations and</li>
+<li>new arbitrary instances can be easily created,</li>
+</ol>
+then the type should implement this model.")]
 model Appendable<@T> : CopyCollector<@T> {
-	$ append(@T element);
+	[doc("Returns a new value of type <tt>$</tt> that is a copy of <tt>this</tt> but contains an additional element <tt>e</tt>.")]
+	$ append(@T e);
 }
 
 extend Str with Appendable<Char> {
@@ -196,13 +228,18 @@ extend Array<@T> with Appendable<@T> {
 
 // PUSHABLE
 
+[doc("All types that support <tt>push</tt> operation should implement this model.")]
 model Pushable<@T> : Collector<@T> {
+	[doc("The exact nature of this operation is left to be specified by implementing types, but it should at least
+	not modify <tt>element</tt>.")]
 	Void push(@T element);
 }
 
 // PIPES
 
+[doc("This is the base model of all iterators.")]
 model Iterator<@T> : StreamSource<@T> {
+	[doc("Returns Just next value, if it is present, and Nothing otherwise.")]
 	@T? next();
 }
 
@@ -272,7 +309,11 @@ extend LimitingIterator<@T> with Iterator<@T> {
 	}
 }
 
+[doc("All collection types (finite or infinite) should implement this model.
+Is used to convert a collection to an iterator.")]
 model StreamSource<@T> {
+	[doc("Returns an iterator that represents all values of the collection. Depending on the implementation, this method
+	may or may not remove the returned values from the collection.")]
 	Iterator<@T> iterator();
 }
 
@@ -326,7 +367,10 @@ extend Str with StreamSource<Char> {
 
 // STREAM OPERATION
 
+[doc("Represents a function or other kind of object that uses values in an iterator to perform a specific operation.
+<tt>@T</tt> is the type of values in the iterator and <tt>@U</tt> is the return type of the operation.")]
 model StreamOperation<@T, @U> {
+	[doc("Performs the operation.")]
 	@U operator |(StreamSource<@T> source);
 }
 
@@ -346,6 +390,8 @@ extend Filter<@T> with StreamOperation<@T, StreamSource<@T>> {
 	}
 }
 
+[doc("Returns a StreamOperation object that returns a new StreamSource object that contains only those values that
+satisfy the given condition.")]
 StreamOperation<@T, StreamSource<@T>> filter<@T>(@T->Bool predicate) {
 	return new Filter<@T> { predicate };
 }
@@ -360,8 +406,9 @@ extend Limit<@T> with StreamOperation<@T, StreamSource<@T>> {
 	}
 }
 
-StreamOperation<@T, StreamSource<@T>> limit<@T>(Int number) {
-	return new Limit<@T> { number };
+[doc("Returns a StreamOperation object that returns a new StreamSource object that contains only <tt>n</tt> first values.")]
+StreamOperation<@T, StreamSource<@T>> limit<@T>(Int n) {
+	return new Limit<@T> { n };
 }
 
 const struct Foreach<@T> {
@@ -380,6 +427,7 @@ extend Foreach<@T> with StreamOperation<@T, Void> {
 	}
 }
 
+[doc("Returns a new StreamOperation object that applies the given function to each value in the source.")]
 StreamOperation<@T, Void> forEach<@T>(@T->Void callback) {
 	return new Foreach<@T> { callback };
 }
@@ -402,21 +450,42 @@ extend Fold<@T, @U> with StreamOperation<@T, @U> {
 	}
 }
 
+[doc("Returns a StreamOperation object that may be used to 'fold' all values in the source into one value.")]
 StreamOperation<@T, @U> fold<@T, @U>(@U collection, (@U, @T)->@U collector) {
 	return new Fold<@T, @U> { collection, collector };
 }
 
+[doc("Creates a new collection from all values in the source by appending (with Appendable.append) them sequentially to a collection.")]
 StreamOperation<@T, @U> appendTo<@T, @U>(@U collection) {
 	return fold(collection, (@U u, @T t) -> @U { return u.append(t); });
 }
 
+[doc("Pushes all values in the source to a collection.")]
 StreamOperation<@T, @U> pushTo<@T, @U>(@U collection) {
 	return fold(collection, (@U u, @T t) -> @U { u.push(t); return u; });
 }
 
 // COLLECTOR
 
+[doc("A Collector is a type of collection that can 'collect', i.e. read values from the stream source and push them to itself.
+The method used may or may not be Pushable.push and the collection may or may not be modified during the process, but this
+is the most common case.
+<br/>
+Example:
+<pre>
+var list = new ArrayList<Int> { new Int[0] };
+var cond = (Int i) -> Bool { return i%2==0; };
+[1 .. 100] | filter(cond) | list.collect();
+</pre>")]
 model Collector<@T> {
+	[doc("Returns a StreamOperation object that reads values from the source and pushes them to the collection.
+	The operation returns the collection after the last push.
+	<br/>
+	<br/>
+	The recommended implementation is
+	<pre>StreamOperation<@T, $> collect() {
+	return pushTo::<@T, $>(this);
+}</pre>")]
 	StreamOperation<@T, $> collect();
 }
 
@@ -432,7 +501,16 @@ extend Array<@T> with CopyCollector<@T> {
 	}
 }
 
+[doc("A variant of Collector that specifically does not modify the collection, but returns a copy.")]
 model CopyCollector<@T> {
+	[doc("Returns a StreamOperation object that reads values from the source and appends them to a copy of the collection.
+	The operation returns a copy of the collection after the last append.
+	<br/>
+	<br/>
+	The recommended implementation is
+	<pre>StreamOperation<@T, $> collect() {
+	return appendTo::<@T, $>(this);
+}</pre>")]
 	StreamOperation<@T, $> collectToCopy();
 }
 
@@ -444,7 +522,10 @@ extend CopyCollector<@T> with Collector<@T> {
 
 // COPYABLE
 
+[doc("All mutable types that support copying, i.e. to prevent mutation of the original object, should implement this model.")]
 model Copyable {
+	[doc("Returns a copy of the <tt>this</tt> object that may be modified without modifying the original object. Possible
+	pointers the object contains are however left unchanged, so mutating them changes them in the original object too.")]
 	$ copy();
 }
 
@@ -460,7 +541,15 @@ extend Array<@T> with Copyable {
 
 // CONTAINER
 
+[doc("If all instances of a type
+<ol>
+<li>are collections of type <tt>@T</tt>,</li>
+<li>have finite size and</li>
+<li>contain only existing values,</li>
+</ol>
+then the type should implement this model.")]
 model Container<@T> : Eq<$>, StreamSource<@T> {
+	[doc("Returns <tt>true</tt> if and only if the collection contains the given value, compared with operator <tt>==</tt>.")]
 	Bool contains(@T value);
 }
 
@@ -483,19 +572,34 @@ extend Array<@T> with Container<@T> {
 
 // STACK
 
+[doc("A data structure that supports the First In Last Out -rule: the <tt>pop</tt> method should remove the element that
+the latest call to <tt>push</tt> added to the collection.")]
 model Stack<@T> : Pushable<@T> {
+	[doc("Removes and returns the most recently added element from the collection.")]
 	@T pop();
 }
 
 // QUEUE
 
+[doc("A data structure that supports the First In First Out -rule: the <tt>pull</tt> method should remove the element that
+has been longest in the collection.")]
 model Queue<@T> : Pushable<@T> {
+	[doc("Removes and returns the most early added element from the collection.")]
 	@T pull();
 }
 
 // LIST
 
+[doc("If all instances of a type satisfy that
+<ol>
+<li>they are collections of type <tt>@T</tt>, (Container 1)</li>
+<li>they have finite and unlimited size, (HasSize 2)</li>
+<li>they contain only existing values and (Container 3)</li>
+<li>the values have a certain order in a way that each value is paired with an ordinal number,</li>
+</ol>
+then the type should implement this model.")]
 model List<@T> : HasSize, Container<@T> {
+	[doc("Returns the value that is located in the given position in the list.")]
 	@T operator [](Int index);
 }
 
@@ -506,7 +610,18 @@ extend Str with List<Char> {
 	}
 }
 
+[doc("If all instances of a type satisfy that
+<ol>
+<li>they are collections of type <tt>@T</tt>, (Container 1)</li>
+<li>they have finite and unlimited size, (HasSize 2)</li>
+<li>they contain only existing values, (Container 3)</li>
+<li>the values have a certain order in a way that each value is paired with an ordinal number and (List 4)</li>
+<li>any value associated with an arbitrary ordinal number can be removed
+    and replaced with a new value with the same number without changing the order of other values,</li>
+</ol>
+then the type should implement this model.")]
 model MutableList<@T> : List<@T> {
+	[doc("Replaces the value in the given position in the list with the given value.")]
 	Void operator []=(Int index, @T value);
 }
 
@@ -526,6 +641,20 @@ extend Array<@T> with MutableList<@T> {
 
 // VARIABLE-SIZE LIST
 
+[doc("If all instances of a type satisfy that
+<ol>
+<li>they are collections of type <tt>@T</tt>, (Container 1)</li>
+<li>they have finite and unlimited size, (HasSize 2)</li>
+<li>they contain only existing values, (Container 3)</li>
+<li>the values have a certain order in a way that each value is paired with an ordinal number, (List 4)</li>
+<li>any value associated with an arbitrary ordinal number can be removed
+    and replaced with a new value with the same number without changing the order of other values, (MutableList 5)</li>
+<li>given an ordinal number, a new value can be added and associated with that number with all values associated with
+    a greater or equal number having their number incremented by one and</li>
+<li>given an ordinal number, the value with associated with that number can be removed with all values with greater number having
+    their number decreased by one,</li>
+</ol>
+then the type should implement this model.")]
 model VariableSizeList<@T> : List<@T>, Stack<@T>, Queue<@T> {
 	Void add(Int index, @T value);
 	@T remove(Int index);
@@ -668,8 +797,11 @@ extend ArrayList<@T> with Copyable {
 
 // OPTIONAL
 
+[doc("Optional provides an interface for the Maybe enum.")]
 model Optional<@T> : Container<@T> {
+	[doc("Returns the value in the <tt>this</tt> object if it is present and the argument value otherwise.")]
 	@T orElse(@T value);
+	[doc("Returns the value in the <tt>this</tt> object if it is present. Otherwise calls the argument function and returns its value.")]
 	@T orElseGet(()->@T getter);
 	Bool isPresent();
 }

@@ -14,6 +14,7 @@ import Lexer
 import Parser
 import Scope
 import Compiler
+import Documentator
 import Util
 
 findModuleFile :: String -> [FilePath] -> IO (Maybe FilePath)
@@ -26,8 +27,8 @@ findModuleFile moduleName (dir:path) = do
     else
         findModuleFile moduleName path
 
-compileCode :: [FilePath] -> [String] -> IO ()
-compileCode searchPath files = do
+parseModulesRecursively :: [FilePath] -> [String] -> IO [Declaration]
+parseModulesRecursively searchPath files = do
     (tree, _) <- flip runStateT [] $ flip rec2 files $ \file -> do
         imported_modules <- get
         if file `elem` imported_modules
@@ -46,6 +47,11 @@ compileCode searchPath files = do
                         lift exitFailure
                         return ""
             return (importFiles, decls)
+    return tree
+
+compileCode :: [FilePath] -> [String] -> IO ()
+compileCode searchPath files = do
+    tree <- parseModulesRecursively searchPath files
     let ((((((_, code0), code1), header0), header1), header2), errors) =
          runWriter $ runWriterT $ runWriterT $ runWriterT $ runWriterT $ runWriterT $
             compile tree
@@ -63,6 +69,20 @@ compileCode searchPath files = do
             >> return 0
     putStrLn ""
     when (sum errs > 0) exitFailure
+
+documentCode searchPath files = do
+    tree <- parseModulesRecursively searchPath files
+    let (_, document) = runWriter $ documentTree tree
+    forM_ document putStrLn
+
+printHelp :: IO ()
+printHelp = do
+    putStrLn "Usage: psc <command> [args]"
+    putStrLn "Available commands:"
+    putStrLn "  compile - compiles given pscript files to c"
+    putStrLn "  document - generates documentation for given pscript files in c"
+    putStrLn "  help - show this help text"
+    exitSuccess
 
 type Args = Map.Map String [String]
 
@@ -86,7 +106,17 @@ main = do
                 ("files", []),
                 ("path", [appUserDataDir | auddExists])
             ]
-    args <- flip parseArgs defaultArgs <$> getArgs
+    (command:cmdArgs) <- getArgs
+    let args = parseArgs cmdArgs defaultArgs
     let (Just files) = Map.lookup "files" args
     let (Just path) = Map.lookup "path" args
-    compileCode path files
+    case command of
+        "compile" ->
+            compileCode path files
+        "document" ->
+            documentCode path files
+        "help" ->
+            printHelp
+        cmd -> do
+            putStrLn ("Unknown command `" ++ cmd ++ "'")
+            printHelp

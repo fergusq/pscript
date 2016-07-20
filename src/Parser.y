@@ -90,10 +90,13 @@ Decl	: Func				{ Func $1 }
 	| Enum				{ Enm $1 }
 	| extern import str ';'		{ ExIm $3 }
 
-Model	: model var '{' EFuncs '}'				{ Model $2 [] [] $4 }
-	| model var '<' TParams '>' '{' EFuncs '}' 		{ Model $2 $4 [] $7 }
-	| model var ':' DtList '{' EFuncs '}'			{ Model $2 [] $4 $6 }
-	| model var '<' TParams '>' ':' DtList  '{' EFuncs '}' 	{ Model $2 $4 $7 $9 }
+Model	: AnnsMdl var '{' EFuncs '}'				{ Model $2 [] [] $4 $1 }
+	| AnnsMdl var '<' TParams '>' '{' EFuncs '}' 		{ Model $2 $4 [] $7 $1 }
+	| AnnsMdl var ':' DtList '{' EFuncs '}'			{ Model $2 [] $4 $6 $1 }
+	| AnnsMdl var '<' TParams '>' ':' DtList  '{' EFuncs '}' 	{ Model $2 $4 $7 $9 $1 }
+
+AnnsMdl	: Ann AnnsMdl			{ ($1 : $2) }
+	| model				{ [] }
 
 TParams	: '@' var ',' TParams		{ ($2 : $4) }
 	| '@' var			{ [$2] }
@@ -315,7 +318,8 @@ data Model = Model {
 	modelName :: String,
 	typeparameters :: [String],
 	prerequisites :: [Datatype],
-	methods :: [Function]
+	methods :: [Function],
+	modelAnnotations :: [(String, [String])]
 }
 
 data Extend = Extend {
@@ -354,11 +358,11 @@ data Datatype
 	| DollarType
 
 instance Show Datatype where
-    show (Typename a []) = '#' : a
-    show (Typename a as) = '#' : a ++ "<" ++ joinComma (map show as) ++ ">"
-    show (SumType dts) = '#' : joinChar '&' (map show dts)
-    show DollarType = "#$"
-    show (Typeparam p) = "#@" ++ p
+    show (Typename a []) = a
+    show (Typename a as) = a ++ "<" ++ joinComma (map show as) ++ ">"
+    show (SumType dts) = joinChar '&' (map show dts)
+    show DollarType = "$"
+    show (Typeparam p) = "@" ++ p
 
 data Statement
 	= Create String Expression
