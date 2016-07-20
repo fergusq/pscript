@@ -198,12 +198,18 @@ Only the solid arrows that can not be inferred from prerequisites are drawn.
 
 ### Syntax sugar in types
 
-|: Sugar :|: De-sugar   :|
+Some types have shortcut forms. They are semantically equivalent to their full forms:
+
+|  Sugar  |  Full        |
 |---------|--------------|
 | `T[]`   | `Array<T>`   |
 | `P->R`  | `Func<R, P>` |
 | `T?`    | `Maybe<T>`   |
 | `T*`    | `Pointer<T>` |
+
+Sugar forms can be chained.
+For example `Int*?[]` is same as `Array<Maybe<Pointer<Int>>>`
+and `Int?->Int?` is same as `Func<Maybe<Int>, Maybe<Int>>`.
 
 ### Primitive datatypes
 
