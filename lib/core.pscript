@@ -364,11 +364,11 @@ StreamOperation<@T, StreamSource<@T>> limit<@T>(Int number) {
 	return new Limit<@T> { number };
 }
 
-const struct Forall<@T> {
+const struct Foreach<@T> {
 	@T->Void callback;
 }
 
-extend Forall<@T> with StreamOperation<@T, Void> {
+extend Foreach<@T> with StreamOperation<@T, Void> {
 	Void operator |(StreamSource<@T> source) {
 		var i = source.iterator();
 		while (true) {
@@ -380,8 +380,8 @@ extend Forall<@T> with StreamOperation<@T, Void> {
 	}
 }
 
-StreamOperation<@T, Void> forAll<@T>(@T->Void callback) {
-	return new Forall<@T> { callback };
+StreamOperation<@T, Void> forEach<@T>(@T->Void callback) {
+	return new Foreach<@T> { callback };
 }
 
 struct Fold<@T, @U> {

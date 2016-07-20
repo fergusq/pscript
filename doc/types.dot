@@ -26,7 +26,7 @@ digraph G {
     /**/Array [shape="hexagon", group="collections"]
     /**/PipeIterator [label="FilteringIterator\nLimitingIterator\nMappingIterator", shape="hexagon", group="iterators"]
     /**/PipeOp [label="Filter\nLimit", shape="hexagon", group="pipes"]
-    /**/PipeEnd [label="Fold\nForall", shape="hexagon", group="pipes"]
+    /**/PipeEnd [label="Fold\nForeach", shape="hexagon", group="pipes"]
     
     // Enums
     /**/Maybe [shape="house", group="collections"]
@@ -59,29 +59,29 @@ digraph G {
     //+Eq -> ArrayList
     //+Eq -> Maybe
     
-    Eq -> Container [style=dotted]
-    StreamSource -> Container [style=dotted]
+    /*-*/Eq -> Container [style=dotted]
+    /*-*/StreamSource -> Container [style=dotted]
     //+Container -> Array
     //+Container -> ArrayList
     //+Container -> Maybe
     
-    HasSize -> List [style=dotted]
-    Container -> List [style=dotted]
+    /*-*/HasSize -> List [style=dotted]
+    /*-*/Container -> List [style=dotted]
     /**/List -> Str
     
-    List -> MutableList [style=dotted]
+    /*-*/List -> MutableList [style=dotted]
     /**/MutableList -> Array
     /**/MutableList -> ArrayList
     
-    List -> VariableSizeList [style=dotted]
-    Stack -> VariableSizeList [style=dotted]
-    Queue -> VariableSizeList [style=dotted]
+    /*-*/List -> VariableSizeList [style=dotted]
+    /*-*/Stack -> VariableSizeList [style=dotted]
+    /*-*/Queue -> VariableSizeList [style=dotted]
     /**/VariableSizeList -> ArrayList
     
-    Pushable -> Stack [style=dotted]
+    /*-*/Pushable -> Stack [style=dotted]
     //+Stack -> ArrayList
     
-    Pushable -> Queue [style=dotted]
+    /*-*/Pushable -> Queue [style=dotted]
     
     //+StreamSource -> Maybe
     //+StreamSource -> Array
@@ -99,22 +99,23 @@ digraph G {
     /**/Summable -> Array
     /**/Summable -> ArrayList
     
-    CopyCollector -> Appendable [style=dotted]
+    /*-*/CopyCollector -> Appendable [style=dotted]
     /**/Appendable -> Array
     /**/Appendable -> ArrayList
+    /**/Appendable -> Str
     
     //+CopyCollector -> Array
     //+CopyCollector -> ArrayList
     
-    Collector -> Pushable [style=dotted]
+    /*-*/Collector -> Pushable [style=dotted]
     //+Pushable -> ArrayList
     
     //+Collector -> ArrayList
     Collector -> CopyCollector
     
-    StreamSource -> Iterator [style=dotted]
+    /*-*/StreamSource -> Iterator [style=dotted]
     /**/Iterator -> PipeIterator
     
-    Container -> Optional [style=dotted]
+    /*-*/Container -> Optional [style=dotted]
     /**/Optional -> Maybe
 }

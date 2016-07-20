@@ -190,7 +190,7 @@ Void main() {
 	var list = [1, 2, 3];
 	var mapper = (Int i) -> Int { return i*i; };
 	var printer = (Int i) -> Void { println(i); };
-	list | mapper | forAll(printer);
+	list | mapper | forEach(printer);
 }
 ==>
 1
@@ -204,7 +204,7 @@ Void main() {
 	var printer = (Int i) -> Void { println(i); };
 	var array = list | mapper | new Int[0].collectToCopy();
 	array[1] = 3;
-	array | forAll(printer);
+	array | forEach(printer);
 }
 ==>
 1
@@ -218,7 +218,7 @@ Void main() {
 	var printer = (Int i) -> Void { println(i); };
 	var array = list | mapper | new ArrayList<Int> { new Int[0] }.collect();
 	array[1] = 8;
-	array | forAll(printer);
+	array | forEach(printer);
 }
 ==>
 16
@@ -229,7 +229,7 @@ Void main() {
 Void main() {
 	var list = [1 .. 100];
 	var printer = (Int i) -> Void { println(i); };
-	list | limit::<Int>(5) | forAll(printer);
+	list | limit::<Int>(5) | forEach(printer);
 }
 ==>
 1
@@ -243,7 +243,7 @@ Void main() {
 	var list = [1 .. 10];
 	var printer = (Int i) -> Void { println(i); };
 	var filterer = (Int i) -> Bool { return i%2==0; };
-	list | filter(filterer) | forAll(printer);
+	list | filter(filterer) | forEach(printer);
 }
 ==>
 2
