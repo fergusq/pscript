@@ -243,6 +243,7 @@ model Iterator<@T> : StreamSource<@T> {
 	@T? next();
 }
 
+[doc("An iterator that iterates over elements of a given array. <tt>location</tt> is the first index to be iterated, usually zero.")]
 struct ArrayIterator<@T> {
 	@T[] elements;
 	Int location;
@@ -260,6 +261,7 @@ extend ArrayIterator<@T> with Iterator<@T> {
 	}
 }
 
+[doc("MappingIterator reads values from the source, applies them to a function, and returns the results.")]
 const struct MappingIterator<@From, @To> {
 	@From -> @To mappingFunction;
 	Iterator<@From> source;
@@ -274,6 +276,7 @@ extend MappingIterator<@F, @T> with Iterator<@T> {
 	}
 }
 
+[doc("Filtering iterator reads values from the source and ignores the values that do not match to a condition.")]
 const struct FilteringIterator<@T> {
 	@T->Bool predicate;
 	Iterator<@T> source;
@@ -294,6 +297,7 @@ extend FilteringIterator<@T> with Iterator<@T> {
 	}
 }
 
+[doc("Limiting iterator iterates over certain number of first elements in the source.")]
 struct LimitingIterator<@T> {
 	Int limit;
 	Iterator<@T> source;
@@ -380,6 +384,7 @@ extend Func<@R, @P> with StreamOperation<@P, StreamSource<@R>> {
 	}
 }
 
+[doc("Acts as a blueprint for creating FilteringIterator objects. Can be used as a StreamOperation. See the <tt>filter</tt> function.")]
 const struct Filter<@T> {
 	@T->Bool predicate;
 }
@@ -396,6 +401,7 @@ StreamOperation<@T, StreamSource<@T>> filter<@T>(@T->Bool predicate) {
 	return new Filter<@T> { predicate };
 }
 
+[doc("Acts as a blueprint for creating LimitingIterator objects. Can be used as a StreamOperation. See the <tt>limit</tt> function.")]
 const struct Limit<@T> {
 	Int limit;
 }
@@ -411,6 +417,7 @@ StreamOperation<@T, StreamSource<@T>> limit<@T>(Int n) {
 	return new Limit<@T> { n };
 }
 
+[doc("Can be used as a StreamOperation that applies all values in the stream to the given function. See the <tt>forEach</tt> function.")]
 const struct Foreach<@T> {
 	@T->Void callback;
 }
@@ -432,6 +439,7 @@ StreamOperation<@T, Void> forEach<@T>(@T->Void callback) {
 	return new Foreach<@T> { callback };
 }
 
+[doc("Can be used as a StreamOperation that constructs a new object from the values in the stream. See the <tt>fold</tt> function.")]
 struct Fold<@T, @U> {
 	@U collection;
 	(@U, @T)->@U collector;
@@ -662,6 +670,7 @@ model VariableSizeList<@T> : List<@T>, Stack<@T>, Queue<@T> {
 
 // ARRAYLIST
 
+[doc("An array with mutable size.")]
 struct ArrayList<@T> {
 	@T[] elements;
 }
@@ -808,6 +817,7 @@ model Optional<@T> : Container<@T> {
 
 // MAYBE
 
+[doc("Represents an object that may or may not be present.")]
 enum Maybe<@T> {
 	Just(@T),
 	Nothing

@@ -323,7 +323,7 @@ treeToLists decls =
         listStruct = Struct "Array" ["T"] [
             ("len", Typename "Int" []),
             ("ptr", Typename "Pointer" [Typeparam "T"])
-            ] True
+            ] True []
 
         structs = Map.fromList $ ("Array", listStruct) :
                 concatMap (\d -> case d of

@@ -156,20 +156,29 @@ Params	: Parameter ',' Params		{ ($1 : $3) }
 
 Parameter : Datatype var		{ ($2, $1) }
 
-Struct	: struct var '{' Fields '}'			{ Struct $2 [] $4 False }
-	| struct var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 False }
-	| struct var '<' TParams '>' '{' '}'		{ Struct $2 $4 [] False }
-	| struct var '{' '}'				{ Struct $2 [] [] False }
-	| const struct var '{' Fields '}'			{ Struct $3 [] $5 True }
-	| const struct var '<' TParams '>' '{' Fields '}'	{ Struct $3 $5 $8 True }
-	| const struct var '<' TParams '>' '{' '}'		{ Struct $3 $5 [] True }
-	| const struct var '{' '}'				{ Struct $3 [] [] True }
+Struct	: AnnsStc var '{' Fields '}'			{ Struct $2 [] $4 False $1 }
+	| AnnsStc var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 False $1 }
+	| AnnsStc var '<' TParams '>' '{' '}'		{ Struct $2 $4 [] False $1 }
+	| AnnsStc var '{' '}'				{ Struct $2 [] [] False $1 }
+	| AnnsCns struct var '{' Fields '}'			{ Struct $3 [] $5 True $1 }
+	| AnnsCns struct var '<' TParams '>' '{' Fields '}'	{ Struct $3 $5 $8 True $1 }
+	| AnnsCns struct var '<' TParams '>' '{' '}'		{ Struct $3 $5 [] True $1 }
+	| AnnsCns struct var '{' '}'				{ Struct $3 [] [] True $1 }
+
+AnnsStc	: Ann AnnsStc			{ ($1 : $2) }
+	| struct			{ [] }
+
+AnnsCns	: Ann AnnsCns			{ ($1 : $2) }
+	| const				{ [] }
 
 Fields	: Parameter ';' Fields		{ ($1 : $3) }
 	| Parameter ';'			{ [$1] }
 
-Enum	: enum var '{' CaseList '}'			{ EnumStruct $2 [] $4 }
-	| enum var '<' TParams '>' '{' CaseList '}'	{ EnumStruct $2 $4 $7 }
+Enum	: AnnsEnm var '{' CaseList '}'			{ EnumStruct $2 [] $4 $1 }
+	| AnnsEnm var '<' TParams '>' '{' CaseList '}'	{ EnumStruct $2 $4 $7 $1 }
+
+AnnsEnm	: Ann AnnsEnm			{ ($1 : $2) }
+	| enum				{ [] }
 
 CaseList: EnumCase ',' CaseList		{ ($1 : $3) }
 	| EnumCase			{ [$1] }
@@ -333,13 +342,15 @@ data Struct = Struct {
 	stcName :: String,
 	stcTypeparameters :: [String],
 	stcFields :: [(String, Datatype)],
-	isConst :: Bool
+	isConst :: Bool,
+	stcAnnotations :: [(String, [String])]
 }
 
 data EnumStruct = EnumStruct {
 	enmName :: String,
 	enmTypeparameters :: [String],
-	enmCases :: [(String, [Datatype])]
+	enmCases :: [(String, [Datatype])],
+	enmAnnotations :: [(String, [String])]
 }
 
 data Function = Function {

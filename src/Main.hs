@@ -70,9 +70,12 @@ compileCode searchPath files = do
     putStrLn ""
     when (sum errs > 0) exitFailure
 
-documentCode searchPath files = do
-    tree <- parseModulesRecursively searchPath files
-    let (_, document) = runWriter $ documentTree tree
+documentCode :: String -> IO ()
+documentCode file = do
+    c <- readFile file
+    let lexemes = lexer 1 c
+    let (ModuleDecl name imports decls) = parsePScript lexemes
+    let (_, document) = runWriter $ documentTree name decls
     forM_ document putStrLn
 
 printHelp :: IO ()
@@ -107,14 +110,14 @@ main = do
                 ("path", [appUserDataDir | auddExists])
             ]
     (command:cmdArgs) <- getArgs
-    let args = parseArgs cmdArgs defaultArgs
-    let (Just files) = Map.lookup "files" args
-    let (Just path) = Map.lookup "path" args
     case command of
-        "compile" ->
+        "compile" -> do
+            let args = parseArgs cmdArgs defaultArgs
+            let (Just files) = Map.lookup "files" args
+            let (Just path) = Map.lookup "path" args
             compileCode path files
         "document" ->
-            documentCode path files
+            documentCode file where (file:as) = cmdArgs
         "help" ->
             printHelp
         cmd -> do
