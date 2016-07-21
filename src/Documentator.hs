@@ -131,8 +131,9 @@ documentModel lvl supers Model {
         handleDocAnn as
         heading (lvl+1) "Definition"
         html "<pre>"
-        html $ "model " ++ mname ++ showTps tps ++ " : " ++ joinComma (map eshow prs)
-            ++ " {\n"
+        html $ "model " ++ mname ++ showTps tps
+        unless (null prs) $ html $ ": " ++ joinComma (map eshow prs)
+        html "{\n"
         forM_ ms $ \m ->
             html $ "    " ++ f2str m ++ "\n"
         html "}\n</pre>"

@@ -25,7 +25,7 @@ digraph G {
     /**/ArrayList [shape="hexagon", group="collections"]
     /**/Array [shape="hexagon", group="collections"]
     /**/PipeIterator [label="FilteringIterator\nLimitingIterator\nMappingIterator", shape="hexagon", group="iterators"]
-    /**/PipeOp [label="Filter\nLimit", shape="hexagon", group="pipes"]
+    /**/PipeOp [label="Filter\nLimit\nSort", shape="hexagon", group="pipes"]
     /**/PipeEnd [label="Fold\nForeach", shape="hexagon", group="pipes"]
     
     // Enums

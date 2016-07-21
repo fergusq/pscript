@@ -267,3 +267,14 @@ false
 true
 not EAGER
 ---
+### Sort
+Void main() {
+	var letters = "abracadabra" | sort::<Char>() | "".collectToCopy();
+	println(letters);
+	var numbers = [5, 2, 8, 9, 3, 5] | sort::<Int>() | new Int[0].collectToCopy();
+	println(numbers);
+}
+==>
+aaaaabbcdrr
+[2, 3, 5, 5, 8, 9]
+---

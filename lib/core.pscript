@@ -473,6 +473,41 @@ StreamOperation<@T, @U> pushTo<@T, @U>(@U collection) {
 	return fold(collection, (@U u, @T t) -> @U { u.push(t); return u; });
 }
 
+// SORT
+
+[doc("Can be used as a StreamOperation that sorts the values in the stream. See the <tt>sort</tt> function.")]
+const struct Sort<@T> {}
+
+extend Sort<@T> with StreamOperation<@T, StreamSource<@T>> {
+	StreamSource<@T> operator |(StreamSource<@T> source) {
+		var list = source | new ArrayList<@T> { [] }.collect();
+		sortList(list);
+		return list;
+	}
+}
+
+[doc("Returns a StreamOperation that reads all values from the source, sorts them and returns a new source.")]
+StreamOperation<@T, StreamSource<@T>> sort<@T>() {
+	return new Sort<@T> {};
+}
+
+[doc("Sorts the given collection using methods <tt>operator &gt;</tt>, <tt>operator []</tt>, <tt>operator []=</tt> and <tt>size</tt>.
+The models List, MutableList and HasSize declare this functionality for the collection.")]
+Void sortList<@T>(@T list) {
+	while (true) {
+		var isSorted = true;
+		for (i in [0 .. list.size()-2]) {
+			if (list[i] > list[i+1]) {
+				var tmp = list[i];
+				list[i] = list[i+1];
+				list[i+1] = tmp;
+				isSorted = false;
+			}
+		}
+		if (isSorted) break;
+	}
+}
+
 // COLLECTOR
 
 [doc("A Collector is a type of collection that can 'collect', i.e. read values from the stream source and push them to itself.

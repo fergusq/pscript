@@ -294,6 +294,7 @@ Prim	: int					{ Int $1 }
 	| '-' Preprim				{ MethodCall $2 "op_neg" [] }
 	| '(' Exp ')'				{ $2 }
 	| '[' Args ']'				{ List $2 }
+	| '[' ']'				{ EmptyList }
 	| '[' Exp dotdot Exp ']'		{ Range $2 $4 }
 	| '(' Params ')' arrow Datatype '{' Stmts '}'	{ Lambda $2 $5 $ Block $7 }
 	| '(' ')' arrow Datatype '{' Stmts '}'	{ Lambda [] $4 $ Block $6 }
@@ -398,6 +399,7 @@ data Expression
 	| Str String
 	| Var String
 	| List [Expression]
+	| EmptyList
 	| Range Expression Expression
 	| Call String [Datatype] [Expression]
 	| NewList Datatype Expression

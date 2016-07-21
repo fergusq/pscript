@@ -806,12 +806,21 @@ compileExpression expdt (List (expr:exprs)) = do
     generateCreate (pArray dt) var ('{': show (length exprs + 1) ++ ", alloc("
                               ++ show (length exprs + 1)
                               ++ "*sizeof(" ++ ctype dt "" ++ "))}")
-    generateAssign (var++".len") (show $ length exprs + 1)
     generateAssign (var++".ptr[0]") firstv
     mapM_ (\(i,val) -> do valuecode <- compileExpressionAs dt val
                           generateAssign (var ++ ".ptr["++show i++"]") valuecode
        ) (zip [1..length exprs] exprs)
     return (var, pArray dt)
+compileExpression expdt EmptyList =
+    case expdt of
+        PInterface "Array" [dt] -> do
+            var <- tmpVar
+            generateCreate (pArray dt) var ("{0, 0}")
+            return (var, pArray dt)
+        _ -> do
+            tellError "can't infer the type of empty list"
+            tellNote ("expected type = " ++ show expdt)
+            return ("NOTHING", pArray PNothing)
 compileExpression expdt (Range from to) = do
     var <- tmpVar
     fromv' <- compileExpressionAs pInteger from
