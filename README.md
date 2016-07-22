@@ -32,3 +32,43 @@ The dollar type `$` represents the type for which the method is implemented,
 `Int` in this case.
 
 See DOC.md for more information.
+
+## Building
+
+Should work with ghc. The parser must be generated using Happy. The program has following dependencies:
+
+* base
+* containers
+* directory
+* mtl
+* split
+
+## Features / TODO
+
+- Literals
+  - [x] String literals
+  - [x] Integer literals
+  - [x] List literals
+  - [ ] Floating point literals
+  - [ ] Character literals
+- Expressions
+  - [x] Lambda functions
+  - [x] Explicit type casts
+  - [ ] Function pointers
+- Declarations
+  - [x] Models
+    - [x] Extensions
+    - [x] Model prerequisites
+    - [ ] Model inheritance
+  - [x] Structs
+  - [x] Enums
+- Generics
+  - [x] The dollar type
+  - [x] Type parametrization of types
+  - [ ] Type parameters in non-virtual methods
+- Type inference
+  - [x] Variable type inference
+  - [x] Type parameter inference
+  - [x] List type inference
+  - [ ] Lambda type inference
+  - [ ] Inference using supertypes

@@ -372,7 +372,64 @@ extend Str with StreamSource<Char> {
 // STREAM OPERATION
 
 [doc("Represents a function or other kind of object that uses values in an iterator to perform a specific operation.
-<tt>@T</tt> is the type of values in the iterator and <tt>@U</tt> is the return type of the operation.")]
+<tt>@T</tt> is the type of values in the iterator and <tt>@U</tt> is the return type of the operation.
+<br/><br/>
+Stream operations can be chained to form a pipeline. Most operations are performed lazily and if the last operation in
+the chain is lazy, then the entire chain probably won't do anything at all.
+<br/><br/>
+A typical chain has one <i>source</i> and one or more <i>operations</i>. The last operation, as noted above, should not be lazy
+and generally should return something (other than StreamSource).
+<pre>
+source | operation | endoperation
+</pre>
+<br/>
+Example:
+<pre>
+var array = [\"Banana\", \"Apple\", \"Peach\"];
+var toQuestion = (Str fruit) -> Str {
+	return \"Do you like to eat the \" ++ fruit ++ \"?\";
+};
+var printIt = (Str s) -> Void { puts(s); };
+array	| toQuestion
+	| sort()
+	| forEach(printIt);
+</pre>
+<br/>
+<table>
+<caption>Usual operations</caption>
+<tr><th>Name</th><th>Description</th><th>Lazy</th><th>Return value</th></tr>
+<tr><td>(map)</td>
+    <td>All lambdas (Func&lt;@U, @T&gt; values) can be used as mapping operations.</td>
+    <td>Yes</td>
+    <td>StreamSource&lt;@U&gt;</td></tr>
+<tr><td><tt><a href='#f_filter'>filter(cond)</a></tt></td>
+    <td>Removes values from the stream if they do not fulfill a condition.</td>
+    <td>Yes</td>
+    <td>StreamSource&lt;@T&gt;</td></tr>
+<tr><td><tt><a href='#f_limit'>limit(n)</a></tt></td>
+    <td>Lets <tt>n</tt> first values in the stream pass through and discards all other values.</td>
+    <td>Yes</td>
+    <td>StreamSource&lt;@T&gt;</td></tr>
+<tr><td><tt><a href='#f_sort'>sort()</a></tt></td>
+    <td>Reads all values from the stream, sorts them and returns a new stream.</td>
+    <td>No</td>
+    <td>StreamSource&lt;@T&gt;</td></tr>
+<tr><td><tt><a href='#f_forEach'>forEach(func)</a></tt></td>
+    <td>Calls a lambda function for each value in the stream.</td>
+    <td>No</td>
+    <td>Void</td></tr>
+<tr><td><tt><a href='#fm_Collector_collect'>collection.collect()</a></tt></td>
+    <td>If <tt>collection</tt> is a value of type @U which implements Collector, then it has
+        method <tt>.collect()</tt> that pushes all values in the stream to the collection.</td>
+    <td>No</td>
+    <td>@U</td></tr>
+<tr><td><tt><a href='#fm_CopyCollector_collect'>collection.collectToCopy()</a></tt></td>
+    <td>If <tt>collection</tt> is a value of type @U which implements CopyCollector, then it has
+        method <tt>.collectToCopy()</tt> that creates a copy of the collection with values of
+        the stream appended.</td>
+    <td>No</td>
+    <td>@U</td></tr>
+</table>")]
 model StreamOperation<@T, @U> {
 	[doc("Performs the operation.")]
 	@U operator |(StreamSource<@T> source);
@@ -434,7 +491,19 @@ extend Foreach<@T> with StreamOperation<@T, Void> {
 	}
 }
 
-[doc("Returns a new StreamOperation object that applies the given function to each value in the source.")]
+[doc("Returns a new StreamOperation object that applies the given function to each value in the source.
+<br/><br/>
+Example:
+<pre>
+[1 .. 100]
+	| (Int i) -> Int {
+		return i*i;
+	}
+	| forEach((Int i) -> Void {
+		println(i);
+	});
+</pre>
+")]
 StreamOperation<@T, Void> forEach<@T>(@T->Void callback) {
 	return new Foreach<@T> { callback };
 }
@@ -458,12 +527,26 @@ extend Fold<@T, @U> with StreamOperation<@T, @U> {
 	}
 }
 
-[doc("Returns a StreamOperation object that may be used to 'fold' all values in the source into one value.")]
+[doc("Returns a StreamOperation object that may be used to 'fold' all values in the source into one value.
+<br/><br/>
+Example:
+<pre>
+var list = [1 .. 10];
+var sum = list | fold(0, (Int sum, Int i) -> Int {
+	return sum + i;
+});
+</pre>
+")]
 StreamOperation<@T, @U> fold<@T, @U>(@U collection, (@U, @T)->@U collector) {
 	return new Fold<@T, @U> { collection, collector };
 }
 
-[doc("Creates a new collection from all values in the source by appending (with Appendable.append) them sequentially to a collection.")]
+[doc("Creates a new collection from all values in the source by appending (with Appendable.append) them sequentially to a collection.
+<br/><br/>
+The standard implementation is:
+<pre>StreamOperation<@T, @U> appendTo<@T, @U>(@U collection) {
+	return fold(collection, (@U u, @T t) -> @U { return u.append(t); });
+}</pre>")]
 StreamOperation<@T, @U> appendTo<@T, @U>(@U collection) {
 	return fold(collection, (@U u, @T t) -> @U { return u.append(t); });
 }
@@ -513,7 +596,7 @@ Void sortList<@T>(@T list) {
 [doc("A Collector is a type of collection that can 'collect', i.e. read values from the stream source and push them to itself.
 The method used may or may not be Pushable.push and the collection may or may not be modified during the process, but this
 is the most common case.
-<br/>
+<br/><br/>
 Example:
 <pre>
 var list = new ArrayList<Int> { new Int[0] };
@@ -544,7 +627,15 @@ extend Array<@T> with CopyCollector<@T> {
 	}
 }
 
-[doc("A variant of Collector that specifically does not modify the collection, but returns a copy.")]
+[doc("A variant of Collector that specifically does not modify the collection, but returns a copy.
+<br/><br/>
+Example:
+<pre>
+var cond = (Int i) -> Bool { return i%2==0; };
+var evenNumbers = [1 .. 100]
+	| filter(cond)
+	| new Int[0].collectToCopy();
+</pre>")]
 model CopyCollector<@T> {
 	[doc("Returns a StreamOperation object that reads values from the source and appends them to a copy of the collection.
 	The operation returns a copy of the collection after the last append.
@@ -584,7 +675,9 @@ extend Array<@T> with Copyable {
 
 // CONTAINER
 
-[doc("If all instances of a type
+[doc("A type of collection that supports the <tt>contains</tt> method.
+<br/>
+If all instances of a type
 <ol>
 <li>are collections of type <tt>@T</tt>,</li>
 <li>have finite size and</li>
@@ -858,10 +951,14 @@ enum Maybe<@T> {
 	Nothing
 }
 
+[doc("Returns <tt>new Maybe<@T>::Just(value)</tt>. The difference from using the constructor direct is that
+the compiler can infer the type parameter <tt>@T</tt> when calling a function.")]
 Maybe<@T> just<@T>(@T value) {
 	return new Maybe<@T>::Just(value);
 }
 
+[doc("Returns <tt>new Maybe<@T>::Nothing()</tt>. The difference from using the constructor direct is that
+the compiler can infer the type parameter <tt>@T</tt> when calling a function.")]
 Maybe<@T> nothing<@T>() {
 	return new Maybe<@T>::Nothing();
 }
