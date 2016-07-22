@@ -127,6 +127,7 @@ lexString ln s ('"':cs) = Token ln (TokenString s) : lexer ln cs
 lexString ln s ('\\':'n':cs) = lexString ln (s ++ "\n") cs
 lexString ln s ('\\':'t':cs) = lexString ln (s ++ "\t") cs
 lexString ln s ('\\':'\\':cs) = lexString ln (s ++ "\\") cs
+lexString ln s ('\\':'"':cs) = lexString ln (s ++ "\"") cs
 lexString ln s ('\n':cs) = lexString (ln+1) (s ++ "\n") cs
 lexString ln s (c:cs) = lexString ln (s ++ [c]) cs
 lexString ln s [] = error ("Unclosed string on line " ++ show ln ++ ": " ++ s)
