@@ -45,6 +45,23 @@ Should work with ghc. The parser must be generated using Happy. The program has 
 
 ## Features / TODO
 
+### Compiler
+
+- [x] Successfully compiles all tests
+- [x] All tests pass
+- [x] Module search path
+- [ ] Meaningful error messages (half-done)
+- [ ] Validation of type parametrized declarations
+- [ ] Compiling multiple modules to multiple filesS
+- [ ] Disable the exponential growth of size of the resulting C-file when using intersection types
+
+### Language
+
+- Modules
+  - [x] Module declarations
+  - [x] Importing modules
+  - [x] Importing external C-functions
+  - [ ] Header files?
 - Literals
   - [x] String literals
   - [x] Integer literals
@@ -65,10 +82,11 @@ Should work with ghc. The parser must be generated using Happy. The program has 
 - Generics
   - [x] The dollar type
   - [x] Type parametrization of types
-  - [ ] Type parameters in non-virtual methods
+  - [x] Type parametrization of functions
 - Type inference
   - [x] Variable type inference
   - [x] Type parameter inference
   - [x] List type inference
   - [ ] Lambda type inference
   - [ ] Inference using supertypes
+  - [ ] Inference of object type using method parameters

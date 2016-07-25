@@ -418,6 +418,12 @@ array	| toQuestion
     <td>Calls a lambda function for each value in the stream.</td>
     <td>No</td>
     <td>Void</td></tr>
+<tr><td><tt><a href='#f_fold'>fold(firstValue, func)</a></tt></td>
+    <td>Creates a new value by applying a binary function to <tt>firstValue</tt> and all values in the stream, eg.
+        if the stream contains values <tt>v1</tt>, <tt>v2</tt> and <tt>v3</tt>, then this operation returns
+        <tt>func(func(func(firstValue, v1), v2), v3)</tt>.</td>
+    <td>No</td>
+    <td>Void</td></tr>
 <tr><td><tt><a href='#fm_Collector_collect'>collection.collect()</a></tt></td>
     <td>If <tt>collection</tt> is a value of type @U which implements Collector, then it has
         method <tt>.collect()</tt> that pushes all values in the stream to the collection.</td>
