@@ -705,19 +705,29 @@ compileCall expdt name tas' args = do
                 return (rt, name++"("++joinComma argcodes++")")
             else if null tas
             then do
-                -- alustava inferointi odotetun tyypin perusteella
                 let rt' = returnType f
+                let ps' = map snd $ parameters f
+
+                -- alustava inferointi odotetun tyypin perusteella
                 rtss <- Map.fromList <$> matchTypeArguments rt' expdt
 
-                -- käännetään argumentit ja inferoidaan samalla
-                let ps' = map snd $ parameters f
-                (acts, ss) <- forxM (zip ps' args) rtss $
-                    \(par', arg) ss -> do
+                -- apufunktio, joka tekee toiminnon argumenteille ja inferoi samalla
+                -- tyyppejä
+                let inferUsing oss func = forxM (zip ps' args) oss $
+                        \(par', arg) ss -> do
                             pt <- substitute' Nothing ss par'
-                            (acode, atype) <- compileExpression pt arg
+                            (acode, atype) <- func pt arg
                             ss' <- Map.fromList <$>
                                 matchTypeArguments par' atype
-                            return ((acode, atype), ss `Map.union` ss')
+                            return ((acode, atype), ss' `Map.union` ss)
+
+                -- "ennustetaan" tyyppiargumenttien arvot käyttämällä parametrityyppien
+                -- ennusteita
+                (_, pss) <- inferUsing rtss $
+                    \_ a -> predictExprType a >>= \t -> return ((), t)
+
+                -- käännetään argumentit ja inferoidaan samalla
+                (acts, ss) <- inferUsing pss compileExpression
 
                 -- selvitetään lopulliset tyypit inferoinnin perusteella
                 rt <- substitute' (Just $ "return type of called " ++ name) ss rt'
@@ -775,6 +785,26 @@ matchTypeArguments _ _ = return []
 
 -- Lausekkeiden kääntäjät
 
+predictExprType :: Expression -> Compiler PDatatype
+predictExprType (Int _) = return pInteger
+predictExprType (Str _) = return pString
+predictExprType (Cast dt _) = getCurrentSubs >>= \ss -> substitute' Nothing ss dt
+predictExprType EmptyList = return $ pArray PNothing
+predictExprType (List (expr:_)) = pArray <$> predictExprType expr
+predictExprType (Range _ _) = return $ pArray pInteger
+predictExprType (NewList dt _)
+    = getCurrentSubs >>= \ss -> pArray <$> substitute' Nothing ss dt
+predictExprType (NewPtrList dt _)
+    = getCurrentSubs >>= \ss -> pPointer <$> substitute' Nothing ss dt
+predictExprType (NewStruct dt _) = getCurrentSubs >>= \ss -> substitute' Nothing ss dt
+predictExprType (NewEnumStruct dt _ _) = getCurrentSubs >>= \ss -> substitute' Nothing ss dt
+predictExprType (Lambda ps rt _ )
+    = PInterface "Func" <$> (getCurrentSubs >>=
+        \ss -> mapM (substitute' Nothing ss) (rt : map snd ps))
+predictExprType (Var name)
+    = getVar name >>= \m -> case m of { Just dt -> return dt; Nothing -> return PNothing }
+predictExprType _ = return PNothing
+
 -- kääntää lausekkeen ja muuttaa sen halutun tyyppiseksi
 compileExpressionAs :: PDatatype -> Expression -> Compiler String
 compileExpressionAs dt exp = do
@@ -815,7 +845,7 @@ compileExpression expdt EmptyList =
     case expdt of
         PInterface "Array" [dt] -> do
             var <- tmpVar
-            generateCreate (pArray dt) var ("{0, 0}")
+            generateCreate (pArray dt) var "{0, 0}"
             return (var, pArray dt)
         _ -> do
             tellError "can't infer the type of empty list"
