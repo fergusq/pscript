@@ -66,15 +66,32 @@ enum YesNo {
 	Yes,
 	No
 }
+enum Box<@T, @U> {
+	Box(@T, @U)
+}
 Void main() {
 	var a = new YesNo::Yes();
 	match (a) {
 		Yes -> println("yes");
 		No  -> println("no");
 	}
+	var b = "cat";
+	match (b) {
+		"dog" -> println("i love dogs");
+		"cat" -> println("i love cats");
+	}
+	var c = new Box<YesNo, Str>::Box(a, b);
+	match (c) {
+		Box(Yes, "dog") -> println("yes dogs");
+		Box(Yes, "cat") -> println("yes cats");
+		Box(No, "dog") -> println("no dogs");
+		Box(No, "cat") -> println("no cats");
+	}
 }
 ==>
 yes
+i love cats
+yes cats
 ---
 ### Maybe
 Void main() {
@@ -277,4 +294,23 @@ Void main() {
 ==>
 aaaaabbcdrr
 [2, 3, 5, 5, 8, 9]
+---
+### Function reference
+Int square(Int i) {
+	return i*i;
+}
+Int sum(Int i, Int j) {
+	return i+j;
+}
+Void main() {
+	var list = [1, 2, 3];
+	var printer = (Int i) -> Void { println(i); };
+	list | &square as Int->Int | forEach(printer);
+	println(list | fold(0, &sum as (Int,Int)->Int));
+}
+==>
+1
+4
+9
+6
 ---

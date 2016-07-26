@@ -689,6 +689,20 @@ compileMatchCase var dt mcond@(MatchCond caseName fieldMatches) = do
             else
                 -- jos ei matchata enumia vastaan, muuttuja on ainoa mahdollinen match
                 return ("1", [(caseName, dt, var)])
+compileMatchCase var dt mcond@(MatchStr str) =
+    case dt of
+        PInterface "Str" [] ->
+            return ("strcmp("++var++", "++show str++")==0", [])
+        _ -> do
+            tellError ("attempted to match a non-str type " ++ show dt)
+            return ("NOTHING", [])
+compileMatchCase var dt mcond@(MatchInt int) =
+    case dt of
+        PInterface "Int" [] ->
+            return (var++"=="++show int, [])
+        _ -> do
+            tellError ("attempted to match a non-int type " ++ show dt)
+            return ("NOTHING", [])
 
 compileCall expdt name tas' args = do
     ss <- getCurrentSubs
@@ -951,6 +965,18 @@ compileExpression expdt (Cast dt expr) = do
     pdt <- substitute' (Just $ "cast to " ++ show dt) ss dt
     var <- compileExpressionAs pdt expr
     return (var, pdt)
+compileExpression expdt (Ref name) =
+    case expdt of
+        PInterface "Func" (rt':ps') -> do
+            ps <- forM ps' $ \pt -> do
+                var <- tmpVar
+                return (var, pdt2dt pt)
+            let rt = pdt2dt rt'
+            -- purkkaa
+            compileExpression expdt (Lambda ps rt $ Return $ Call name [] $ map (Var . fst) ps)
+        _ -> do
+            tellError ("can't infer the type of function reference &" ++ name)
+            return ("NOTHING", PNothing)
 compileExpression expdt (Lambda ps' rt' stmt) = do
     -- tarkistetaan, että parametrit eivät peitä muuttujia
     forM_ ps' $ \(n, _) -> do

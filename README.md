@@ -71,7 +71,7 @@ Should work with ghc. The parser must be generated using Happy. The program has 
 - Expressions
   - [x] Lambda functions
   - [x] Explicit type casts
-  - [ ] Function pointers
+  - [x] Function pointers
 - Declarations
   - [x] Models
     - [x] Extensions

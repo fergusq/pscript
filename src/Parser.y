@@ -196,6 +196,7 @@ Datatype: PrimDT			{ $1 }
 	| '(' DtList ')' arrow Datatype	{ Typename "Func" ($5:$2) }
 	| '(' ')' arrow Datatype	{ Typename "Func" [$4] }
 	| Datatype '?'			{ Typename "Maybe" [$1] }
+	| '<' Datatype '>'		{ $2 }
 
 SumDT	: PrimDT '&' SumDT		{ ($1 : $3) }
 	| PrimDT			{ [$1] }
@@ -228,6 +229,8 @@ MatchCase: MatchCond arrow Stmt		{ ($1, $3) }
 MatchCond
 	: var				{ MatchCond $1 [] }
 	| var '(' MatchConds ')'	{ MatchCond $1 $3 }
+	| str				{ MatchStr $1 }
+	| int				{ MatchInt $1 }
 
 MatchConds
 	: MatchCond ',' MatchConds	{ ($1 : $3) }
@@ -290,6 +293,7 @@ Preprim	: Call				{ $1 }
 Prim	: int					{ Int $1 }
 	| str					{ Str $1 }
 	| var					{ Var $1 }
+	| '&' var				{ Ref $2 }
 	| '!' Preprim				{ MethodCall $2 "op_not" [] }
 	| '-' Preprim				{ MethodCall $2 "op_neg" [] }
 	| '(' Exp ')'				{ $2 }
@@ -392,12 +396,15 @@ data Statement
 
 data MatchCondition
 	= MatchCond String [MatchCondition]
+	| MatchStr String
+	| MatchInt Int
 
 data Expression
 	= MethodCall Expression String [Expression]
 	| Int Int
 	| Str String
 	| Var String
+	| Ref String
 	| List [Expression]
 	| EmptyList
 	| Range Expression Expression
