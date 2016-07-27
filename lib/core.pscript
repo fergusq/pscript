@@ -1026,3 +1026,73 @@ extend Maybe<@T> with Optional<@T> {
 		return false;
 	}
 }
+
+// RESULT
+
+enum Result<@T, @E> {
+	Ok(@T),
+	Error(@E)
+}
+
+Result<@T, @E> ok<@T, @E>(@T value) {
+	return new Result<@T, @E>::Ok(value);
+}
+
+Result<@T, @E> error<@T, @E>(@E value) {
+	return new Result<@T, @E>::Error(value);
+}
+
+extend Result<@T, @E> with StreamSource<@T> {
+	Iterator<@T> iterator() {
+		match (this) {
+			Ok(v) -> return [v].iterator();
+		}
+		return new @T[0].iterator();
+	}
+}
+
+extend Result<@T, @E> with Eq<Result<@T, @E>> {
+	Bool operator ==(Result<@T, @E> result) {
+		match (this) {
+			Ok(v1) -> match (result) {
+				Ok(v2) -> return v1 == v2;
+			}
+		}
+		return false;
+	}
+	Bool operator !=(Result<@T, @E> result) {
+		return !(this == result);
+	}
+}
+
+extend Result<@T, @E> with Container<@T> {
+	Bool contains(@T value) {
+		match (this) {
+			Ok(v) -> return value == v;
+		}
+		return false;
+	}
+}
+
+extend Result<@T, @E> with Optional<@T> {
+	@T orElse(@T value) {
+		match (this) {
+			Ok(v) -> return v;
+		}
+		return value;
+	}
+	
+	@T orElseGet(()->@T getter) {
+		match (this) {
+			Ok(v) -> return v;
+		}
+		return getter.call();
+	}
+	
+	Bool isPresent() {
+		match (this) {
+			Ok(v) -> return true;
+		}
+		return false;
+	}
+}

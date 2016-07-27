@@ -289,8 +289,9 @@ ensureExtendIsDefined dt@(PInterface _ ts) extend = unless (null $ eTypeparamete
                   ++ ": wrong number of type parameters in extension declaration")
      else do
         let ss = Map.fromList $ zip (eTypeparameters extend) ts
-        conditionallyCreateExtend (show dt ++ show (model extend)) $
-            queueDecl ss $ Ext extend
+        unless (isPNothing dt) $
+            conditionallyCreateExtend (show dt ++ show (model extend)) $
+                queueDecl ss $ Ext extend
 
 -- varmistaa, että tyyppiparametrisoidun funktion haluttu versio generoidaan
 ensureFunctionIsDefined :: [PDatatype] -> Function -> Compiler ()
@@ -733,7 +734,7 @@ compileCall expdt name tas' args = do
                             (acode, atype) <- func pt arg
                             ss' <- Map.fromList <$>
                                 matchTypeArguments par' atype
-                            return ((acode, atype), ss' `Map.union` ss)
+                            return ((acode, atype), ss `noNothingUnion` ss')
 
                 -- "ennustetaan" tyyppiargumenttien arvot käyttämällä parametrityyppien
                 -- ennusteita
@@ -796,6 +797,14 @@ matchTypeArguments par@(Typename pname pts) arg@(PInterface aname ats) =
 matchTypeArguments _ PNothing = return []
 matchTypeArguments par@(Typeparam pname) arg = return [(pname, arg)]
 matchTypeArguments _ _ = return []
+
+noNothingUnion :: Subs -> Subs -> Subs
+ss `noNothingUnion` ss' = ss `nnunion` Map.toList ss'
+
+ss `nnunion` [] = ss
+ss `nnunion` ((n,t):ss') = case Map.lookup n ss of
+    Nothing -> Map.insert n t ss `nnunion` ss'
+    Just dt -> (if isPNothing dt then Map.insert n t ss else ss) `nnunion` ss'
 
 -- Lausekkeiden kääntäjät
 
@@ -951,7 +960,7 @@ compileExpression expdt (FieldGet obj field) = do
 compileExpression expdt (FieldSet obj field val) = do
     (var, dt) <- compileExpression PNothing obj
     ifFieldExists dt field ("NOTHING", PNothing) $ \t -> do
-        (valcode, dt2) <- compileExpression dt val
+        (valcode, dt2) <- compileExpression t val
         valv <- createTmpVarIfNeeded dt2 valcode
         var3 <- tmpVar
         checktype var3 valv t dt2

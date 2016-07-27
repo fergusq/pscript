@@ -28,6 +28,12 @@ ifDollar PDollar t           = t
 ifDollar (PInterface n ts) t = PInterface n (map (`ifDollar` t) ts)
 ifDollar PNothing _          = PNothing
 
+isPNothing :: PDatatype -> Bool
+isPNothing PNothing = True
+isPNothing PDollar = False
+isPNothing (PSum ts) = any isPNothing ts
+isPNothing (PInterface _ ts) = any isPNothing ts
+
 isVarargsType :: PDatatype -> Bool
 isVarargsType (PInterface "Func" _) = True
 isVarargsType _                     = False

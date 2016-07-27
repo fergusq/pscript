@@ -61,11 +61,14 @@ compileCode searchPath files = do
     forM_ code1 putStr
     forM_ code0 putStr
     errs <- forM errors $ \e -> case e of
-        ErrorMsg EErr place msg -> hPutStrLn stderr ("[" ++ place ++ "] error: " ++ msg)
+        ErrorMsg EErr place msg ->
+            hPutStrLn stderr ("[" ++ place ++ "] \x1b[1;31merror\x1b[0m: " ++ msg)
             >> return 1
-        ErrorMsg EWarn place msg -> hPutStrLn stderr ("[" ++ place ++ "] warning: " ++ msg)
+        ErrorMsg EWarn place msg ->
+            hPutStrLn stderr ("[" ++ place ++ "] \x1b[1;33mwarning\x1b[0m: " ++ msg)
             >> return 0
-        ErrorMsg ENote place msg -> hPutStrLn stderr ("[" ++ place ++ "] note: " ++ msg)
+        ErrorMsg ENote place msg ->
+            hPutStrLn stderr ("[" ++ place ++ "] \x1b[1;36mnote\x1b[0m: " ++ msg)
             >> return 0
     putStrLn ""
     when (sum errs > 0) exitFailure

@@ -27,6 +27,7 @@ data TokenClass
 	| TokenImport
 	| TokenBreak
 	| TokenContinue
+	| TokenPass
 	| TokenSub
 	| TokenSuper
 	| TokenInt Int
@@ -163,4 +164,5 @@ lexVar ln cs =
 		("import",rest)  -> Token ln TokenImport : lexer ln rest
 		("break",rest)  -> Token ln TokenBreak : lexer ln rest
 		("continue",rest)  -> Token ln TokenContinue : lexer ln rest
+		("pass",rest)  -> Token ln TokenPass : lexer ln rest
 		(var,rest)       -> Token ln (TokenVarname var) : lexer ln rest

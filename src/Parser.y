@@ -33,6 +33,7 @@ import Util
 	import		{ Token _ TokenImport }
 	break		{ Token _ TokenBreak }
 	continue	{ Token _ TokenContinue }
+	pass		{ Token _ TokenPass }
 	int		{ Token _ (TokenInt $$) }
 	str		{ Token _ (TokenString $$) }
 	var		{ Token _ (TokenVarname $$) }
@@ -226,6 +227,7 @@ Matches	: MatchCase Matches		{ ($1 : $2) }
 	| MatchCase			{ [$1] }
 
 MatchCase: MatchCond arrow Stmt		{ ($1, $3) }
+	| MatchCond arrow pass ';'	{ ($1, Block []) }
 MatchCond
 	: var				{ MatchCond $1 [] }
 	| var '(' MatchConds ')'	{ MatchCond $1 $3 }
