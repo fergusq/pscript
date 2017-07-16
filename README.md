@@ -43,8 +43,10 @@ To build the compiler, you need the Happy parser generator and Cabal installed. 
 * mtl
 * split
 
-        happy src/Parser.y
-        cabal build
+Commands:
+
+    happy src/Parser.y
+    cabal build
 
 ## Features / TODO
 
