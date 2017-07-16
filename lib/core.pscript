@@ -15,13 +15,13 @@ model String {
 	Str toString();
 }
 
-extend Str with String {
+extend Str : String {
 	Str toString() {
 		return this;
 	}
 }
 
-extend Int with String {
+extend Int : String {
 	Str toString() {
 		var str = new Char*(20);
 		sprintf(str, "%d", this);
@@ -29,7 +29,7 @@ extend Int with String {
 	}
 }
 
-extend Char with String {
+extend Char : String {
 	Str toString() {
 		var str = new Char*(2);
 		str[0] = this;
@@ -37,14 +37,14 @@ extend Char with String {
 	}
 }
 
-extend Bool with String {
+extend Bool : String {
 	Str toString() {
 		if (this) return "true";
 		else return "false";
 	}
 }
 
-extend Array<@T> with String {
+extend Array<@T> : String {
 	Str toString() {
 		var str = "[";
 		var i = 0;
@@ -70,7 +70,7 @@ model Eq<@T> {
 	Bool operator !=(@T t);
 }
 
-extend Str with Eq<Str> {
+extend Str : Eq<Str> {
 	Bool operator ==(Str t) {
 		return strcmp(this, t) == 0;
 	}
@@ -79,7 +79,7 @@ extend Str with Eq<Str> {
 	}
 }
 
-extend String with Eq<String> {
+extend String : Eq<String> {
 	Bool operator ==(String t) {
 		return this.toString() == t.toString();
 	}
@@ -88,7 +88,7 @@ extend String with Eq<String> {
 	}
 }
 
-extend Array<@T> with Eq<Array<@T>> {
+extend Array<@T> : Eq<Array<@T>> {
 	Bool operator ==(@T[] t) {
 		if (this.len != t.len) return false;
 		for (i in [0 .. this.len-1]) {
@@ -120,7 +120,7 @@ model Summable<@T> {
 	@T sumIdentity();
 }
 
-extend String with Summable<String> {
+extend String : Summable<String> {
 	String operator ++(String t) {
 		return this.toString() ++ t;
 	}
@@ -130,7 +130,7 @@ extend String with Summable<String> {
 	}
 }
 
-extend Str with Summable<String> {
+extend Str : Summable<String> {
 	Str operator ++(String t) {
 		var newString = new Char*(this.size()+t.size()+1);
 		strcpy(newString, this);
@@ -142,7 +142,7 @@ extend Str with Summable<String> {
 	}
 }
 
-extend Array<@T> with Summable<Array<@T>> {
+extend Array<@T> : Summable<Array<@T>> {
 	Array<@T> operator ++(Array<@T> a) {
 		var arr = new @T[this.len + a.len];
 		var i = 0;
@@ -176,19 +176,19 @@ model HasSize {
 	Int size();
 }
 
-extend String with HasSize {
+extend String : HasSize {
 	Int size() {
 		return this.toString().size();
 	}
 }
 
-extend Str with HasSize {
+extend Str : HasSize {
 	Int size() {
 		return strlen(this);
 	}
 }
 
-extend Array<@T> with HasSize {
+extend Array<@T> : HasSize {
 	Int size() {
 		return this.len;
 	}
@@ -209,13 +209,13 @@ model Appendable<@T> : CopyCollector<@T> {
 	$ append(@T e);
 }
 
-extend Str with Appendable<Char> {
+extend Str : Appendable<Char> {
 	Str append(Char chr) {
 		return this ++ chr;
 	}
 }
 
-extend Array<@T> with Appendable<@T> {
+extend Array<@T> : Appendable<@T> {
 	@T[] append(@T item) {
 		var newArray = new @T[this.len+1];
 		for (i in [0 .. this.len-1]) {
@@ -249,7 +249,7 @@ struct ArrayIterator<@T> {
 	Int location;
 }
 
-extend ArrayIterator<@T> with Iterator<@T> {
+extend ArrayIterator<@T> : Iterator<@T> {
 	@T? next() {
 		if (this.location < this.elements.len) {
 			this.location = this.location + 1;
@@ -267,7 +267,7 @@ const struct MappingIterator<@From, @To> {
 	Iterator<@From> source;
 }
 
-extend MappingIterator<@F, @T> with Iterator<@T> {
+extend MappingIterator<@F, @T> : Iterator<@T> {
 	@T? next() {
 		match (this.source.next()) {
 			Just(v) -> return just(this.mappingFunction.call(v));
@@ -282,7 +282,7 @@ const struct FilteringIterator<@T> {
 	Iterator<@T> source;
 }
 
-extend FilteringIterator<@T> with Iterator<@T> {
+extend FilteringIterator<@T> : Iterator<@T> {
 	@T? next() {
 		while (true) {
 			match (this.source.next()) {
@@ -304,7 +304,7 @@ struct LimitingIterator<@T> {
 	Int position;
 }
 
-extend LimitingIterator<@T> with Iterator<@T> {
+extend LimitingIterator<@T> : Iterator<@T> {
 	@T? next() {
 		if (this.position >= this.limit)
 			return nothing();
@@ -321,49 +321,49 @@ model StreamSource<@T> {
 	Iterator<@T> iterator();
 }
 
-extend Iterator<@T> with StreamSource<@T> {
+extend Iterator<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return this;
 	}
 }
 
-//forall $ : Iterator<@T> extend $ with StreamSource<@T> {
+//forall $ : Iterator<@T> extend $ : StreamSource<@T> {
 //	Iterator<@T> iterator() {
 //		return this;
 //	}
 //}
 
-extend ArrayIterator<@T> with StreamSource<@T> {
+extend ArrayIterator<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return this;
 	}
 }
 
-extend MappingIterator<@F, @T> with StreamSource<@T> {
+extend MappingIterator<@F, @T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return this;
 	}
 }
 
-extend FilteringIterator<@T> with StreamSource<@T> {
+extend FilteringIterator<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return this;
 	}
 }
 
-extend LimitingIterator<@T> with StreamSource<@T> {
+extend LimitingIterator<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return this;
 	}
 }
 
-extend Array<@T> with StreamSource<@T> {
+extend Array<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return new ArrayIterator<@T> { this, 0 };
 	}
 }
 
-extend Str with StreamSource<Char> {
+extend Str : StreamSource<Char> {
 	Iterator<Char> iterator() {
 		return stringToArray(this).iterator();
 	}
@@ -441,7 +441,7 @@ model StreamOperation<@T, @U> {
 	@U operator |(StreamSource<@T> source);
 }
 
-extend Func<@R, @P> with StreamOperation<@P, StreamSource<@R>> {
+extend Func<@R, @P> : StreamOperation<@P, StreamSource<@R>> {
 	StreamSource<@R> operator |(StreamSource<@P> source) {
 		return new MappingIterator<@P, @R> { this, source.iterator() };
 	}
@@ -452,7 +452,7 @@ const struct Filter<@T> {
 	@T->Bool predicate;
 }
 
-extend Filter<@T> with StreamOperation<@T, StreamSource<@T>> {
+extend Filter<@T> : StreamOperation<@T, StreamSource<@T>> {
 	StreamSource<@T> operator |(StreamSource<@T> source) {
 		return new FilteringIterator<@T> { this.predicate, source.iterator() };
 	}
@@ -469,7 +469,7 @@ const struct Limit<@T> {
 	Int limit;
 }
 
-extend Limit<@T> with StreamOperation<@T, StreamSource<@T>> {
+extend Limit<@T> : StreamOperation<@T, StreamSource<@T>> {
 	StreamSource<@T> operator |(StreamSource<@T> source) {
 		return new LimitingIterator<@T> { this.limit, source.iterator(), 0 };
 	}
@@ -485,7 +485,7 @@ const struct Foreach<@T> {
 	@T->Void callback;
 }
 
-extend Foreach<@T> with StreamOperation<@T, Void> {
+extend Foreach<@T> : StreamOperation<@T, Void> {
 	Void operator |(StreamSource<@T> source) {
 		var i = source.iterator();
 		while (true) {
@@ -520,7 +520,7 @@ struct Fold<@T, @U> {
 	(@U, @T)->@U collector;
 }
 
-extend Fold<@T, @U> with StreamOperation<@T, @U> {
+extend Fold<@T, @U> : StreamOperation<@T, @U> {
 	@U operator |(StreamSource<@T> source) {
 		var i = source.iterator();
 		while (true) {
@@ -567,7 +567,7 @@ StreamOperation<@T, @U> pushTo<@T, @U>(@U collection) {
 [doc("Can be used as a StreamOperation that sorts the values in the stream. See the <tt>sort</tt> function.")]
 const struct Sort<@T> {}
 
-extend Sort<@T> with StreamOperation<@T, StreamSource<@T>> {
+extend Sort<@T> : StreamOperation<@T, StreamSource<@T>> {
 	StreamSource<@T> operator |(StreamSource<@T> source) {
 		var list = source | new ArrayList<@T> { [] }.collect();
 		sortList(list);
@@ -621,13 +621,13 @@ model Collector<@T> {
 	StreamOperation<@T, $> collect();
 }
 
-extend Str with CopyCollector<Char> {
+extend Str : CopyCollector<Char> {
 	StreamOperation<Char, Str> collectToCopy() {
 		return appendTo::<Char, Str>(this);
 	}
 }
 
-extend Array<@T> with CopyCollector<@T> {
+extend Array<@T> : CopyCollector<@T> {
 	StreamOperation<@T, Array<@T>> collectToCopy() {
 		return appendTo::<@T, Array<@T>>(this);
 	}
@@ -654,7 +654,7 @@ model CopyCollector<@T> {
 	StreamOperation<@T, $> collectToCopy();
 }
 
-extend CopyCollector<@T> with Collector<@T> {
+extend CopyCollector<@T> : Collector<@T> {
 	StreamOperation<@T, $> collect() {
 		return this.collectToCopy();
 	}
@@ -669,7 +669,7 @@ model Copyable {
 	$ copy();
 }
 
-extend Array<@T> with Copyable {
+extend Array<@T> : Copyable {
 	@T[] copy() {
 		var newList = new @T[this.size()];
 		for (i in [0 .. this.size()-1]) {
@@ -695,7 +695,7 @@ model Container<@T> : Eq<$>, StreamSource<@T> {
 	Bool contains(@T value);
 }
 
-extend Str with Container<Char> {
+extend Str : Container<Char> {
 	Bool contains(Char value) {
 		return this | fold(false, (Bool contains, Char chr) -> Bool {
 			return contains || chr == value;
@@ -703,7 +703,7 @@ extend Str with Container<Char> {
 	}
 }
 
-extend Array<@T> with Container<@T> {
+extend Array<@T> : Container<@T> {
 	Bool contains(@T value) {
 		for (item in this) {
 			if (item == value) return true;
@@ -745,7 +745,7 @@ model List<@T> : HasSize, Container<@T> {
 	@T operator [](Int index);
 }
 
-extend Str with List<Char> {
+extend Str : List<Char> {
 	[SuppressWarnings]
 	Char operator [](Int index) {
 		return (this as Char*)[index];
@@ -767,14 +767,14 @@ model MutableList<@T> : List<@T> {
 	Void operator []=(Int index, @T value);
 }
 
-extend Array<@T> with List<@T> {
+extend Array<@T> : List<@T> {
 	[SuppressWarnings]
 	@T operator [](Int index) {
 		return this.ptr[index];
 	}
 }
 
-extend Array<@T> with MutableList<@T> {
+extend Array<@T> : MutableList<@T> {
 	[SuppressWarnings]
 	Void operator []=(Int index, @T value) {
 		this.ptr[index] = value;
@@ -804,24 +804,24 @@ model VariableSizeList<@T> : List<@T>, Stack<@T>, Queue<@T> {
 
 // ARRAYLIST
 
-[doc("An array with mutable size.")]
+[doc("An array : mutable size.")]
 struct ArrayList<@T> {
 	@T[] elements;
 }
 
-extend ArrayList<@T> with HasSize {
+extend ArrayList<@T> : HasSize {
 	Int size() {
 		return this.elements.size();
 	}
 }
 
-extend ArrayList<@T> with String {
+extend ArrayList<@T> : String {
 	Str toString() {
 		return "ArrayList { " ++ this.elements ++ " }";
 	}
 }
 
-extend ArrayList<@T> with Eq<ArrayList<@T>> {
+extend ArrayList<@T> : Eq<ArrayList<@T>> {
 	Bool operator ==(ArrayList<@T> al) {
 		return this.elements == al.elements;
 	}
@@ -830,43 +830,43 @@ extend ArrayList<@T> with Eq<ArrayList<@T>> {
 	}
 }
 
-extend ArrayList<@T> with Container<@T> {
+extend ArrayList<@T> : Container<@T> {
 	Bool contains(@T value) {
 		return this.elements.contains(value);
 	}
 }
 
-extend ArrayList<@T> with List<@T> {
+extend ArrayList<@T> : List<@T> {
 	@T operator [](Int index) {
 		return this.elements[index];
 	}
 }
 
-extend ArrayList<@T> with MutableList<@T> {
+extend ArrayList<@T> : MutableList<@T> {
 	Void operator []=(Int index, @T value) {
 		this.elements[index] = value;
 	}
 }
 
-extend ArrayList<@T> with Pushable<@T> {
+extend ArrayList<@T> : Pushable<@T> {
 	Void push(@T value) {
 		this.elements = this.elements.append(value);
 	}
 }
 
-extend ArrayList<@T> with Stack<@T> {
+extend ArrayList<@T> : Stack<@T> {
 	@T pop() {
 		return this.remove(this.size()-1);
 	}
 }
 
-extend ArrayList<@T> with Queue<@T> {
+extend ArrayList<@T> : Queue<@T> {
 	@T pull() {
 		return this.remove(0);
 	}
 }
 
-extend ArrayList<@T> with VariableSizeList<@T> {
+extend ArrayList<@T> : VariableSizeList<@T> {
 	Void add(Int index, @T value) {
 		var arr = new @T[this.size()+1];
 		var i = 0;
@@ -898,7 +898,7 @@ extend ArrayList<@T> with VariableSizeList<@T> {
 	}
 }
 
-extend ArrayList<@T> with Summable<ArrayList<@T>> {
+extend ArrayList<@T> : Summable<ArrayList<@T>> {
 	ArrayList<@T> operator ++(ArrayList<@T> l) {
 		return new ArrayList<@T> { this.elements ++ l.elements };
 	}
@@ -908,31 +908,31 @@ extend ArrayList<@T> with Summable<ArrayList<@T>> {
 	}
 }
 
-extend ArrayList<@T> with Appendable<@T> {
+extend ArrayList<@T> : Appendable<@T> {
 	ArrayList<@T> append(@T value) {
 		return new ArrayList<@T> { this.elements.append(value) };
 	}
 }
 
-extend ArrayList<@T> with CopyCollector<@T> {
+extend ArrayList<@T> : CopyCollector<@T> {
 	StreamOperation<@T, ArrayList<@T>> collectToCopy() {
 		return appendTo::<@T, ArrayList<@T>>(this);
 	}
 }
 
-extend ArrayList<@T> with Collector<@T> {
+extend ArrayList<@T> : Collector<@T> {
 	StreamOperation<@T, ArrayList<@T>> collect() {
 		return pushTo::<@T, ArrayList<@T>>(this);
 	}
 }
 
-extend ArrayList<@T> with StreamSource<@T> {
+extend ArrayList<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		return new ArrayIterator<@T> { this.elements, 0 };
 	}
 }
 
-extend ArrayList<@T> with Copyable {
+extend ArrayList<@T> : Copyable {
 	ArrayList<@T> copy() {
 		return new ArrayList<@T> { this.elements.copy() };
 	}
@@ -969,7 +969,7 @@ Maybe<@T> nothing<@T>() {
 	return new Maybe<@T>::Nothing();
 }
 
-extend Maybe<@T> with Eq<Maybe<@T>> {
+extend Maybe<@T> : Eq<Maybe<@T>> {
 	Bool operator ==(Maybe<@T> al) {
 		match (this) {
 			Just(v1) -> match (al) {
@@ -986,7 +986,7 @@ extend Maybe<@T> with Eq<Maybe<@T>> {
 	}
 }
 
-extend Maybe<@T> with Container<@T> {
+extend Maybe<@T> : Container<@T> {
 	Bool contains(@T value) {
 		match (this) {
 			Just(v) -> return v == value;
@@ -995,7 +995,7 @@ extend Maybe<@T> with Container<@T> {
 	}
 }
 
-extend Maybe<@T> with StreamSource<@T> {
+extend Maybe<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		match (this) {
 			Just(v) -> return new ArrayIterator<@T> { [v], 0 };
@@ -1004,7 +1004,7 @@ extend Maybe<@T> with StreamSource<@T> {
 	}
 }
 
-extend Maybe<@T> with Optional<@T> {
+extend Maybe<@T> : Optional<@T> {
 	@T orElse(@T value) {
 		match (this) {
 			Just(v) -> return v;
@@ -1042,7 +1042,7 @@ Result<@T, @E> error<@T, @E>(@E value) {
 	return new Result<@T, @E>::Error(value);
 }
 
-extend Result<@T, @E> with StreamSource<@T> {
+extend Result<@T, @E> : StreamSource<@T> {
 	Iterator<@T> iterator() {
 		match (this) {
 			Ok(v) -> return [v].iterator();
@@ -1051,7 +1051,7 @@ extend Result<@T, @E> with StreamSource<@T> {
 	}
 }
 
-extend Result<@T, @E> with Eq<Result<@T, @E>> {
+extend Result<@T, @E> : Eq<Result<@T, @E>> {
 	Bool operator ==(Result<@T, @E> result) {
 		match (this) {
 			Ok(v1) -> match (result) {
@@ -1065,7 +1065,7 @@ extend Result<@T, @E> with Eq<Result<@T, @E>> {
 	}
 }
 
-extend Result<@T, @E> with Container<@T> {
+extend Result<@T, @E> : Container<@T> {
 	Bool contains(@T value) {
 		match (this) {
 			Ok(v) -> return value == v;
@@ -1074,7 +1074,7 @@ extend Result<@T, @E> with Container<@T> {
 	}
 }
 
-extend Result<@T, @E> with Optional<@T> {
+extend Result<@T, @E> : Optional<@T> {
 	@T orElse(@T value) {
 		match (this) {
 			Ok(v) -> return v;

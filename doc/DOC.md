@@ -16,7 +16,7 @@ model Foo {
 	Int bar();
 }
 
-extend Int with Foo {
+extend Int : Foo {
 	Int bar() {
 		return this + 5;
 	}
@@ -26,14 +26,14 @@ extend Int with Foo {
 When extending a generic type, each type parameter must be specified. Pattern matching is not yet supported.
 
 ```
-extend Array<@T> with Foo {
+extend Array<@T> : Foo {
 	Int bar() {
 		return this.size() + 5;
 	}
 }
 
 // Pattern matching is not yet supported:
-// extend Pointer<Int> with Foo {
+// extend Pointer<Int> : Foo {
 //	Int bar() {
 //		return this~ + 5;
 //	}
@@ -72,7 +72,7 @@ When extending a type with a model which uses dollar types in method signatures,
 we are extending:
 
 ```
-extend Int with Increment {
+extend Int : Increment {
 	Int plusone() {
 		return this + 1;
 	}
@@ -137,7 +137,7 @@ model AddingPrinter<@T> {
 
 const struct AddingPrinterImpl<@T> { @T prefix; }
 
-extend AddingPrinterImpl<@T> with AddingPrinter<@T> {
+extend AddingPrinterImpl<@T> : AddingPrinter<@T> {
 	Void print(@T value) {
 		puts((this::prefix + value).toString());
 	}

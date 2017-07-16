@@ -42,7 +42,7 @@ Void main() {
 ---
 ### Squarable
 model Squarable { $ square(); }
-extend Int with Squarable { Int square() { return this*this; } }
+extend Int : Squarable { Int square() { return this*this; } }
 Void main() {
 	println(6.square());
 }
@@ -51,9 +51,9 @@ Void main() {
 ---
 ### Squarable&Printable
 model Squarable { $ square(); }
-extend Int with Squarable { Int square() { return this*this; } }
+extend Int : Squarable { Int square() { return this*this; } }
 model Printable { Void print(); }
-extend Int with Printable { Void print() { println(this); } }
+extend Int : Printable { Void print() { println(this); } }
 Void shout(Squarable&Printable p) { p.square().print(); }
 Void main() {
 	shout(5);

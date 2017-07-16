@@ -21,7 +21,7 @@ model Squarable {
 	$ square();
 }
 
-extend Int with Squarable {
+extend Int : Squarable {
 	Int square() {
 		return this*this;
 	}

@@ -19,7 +19,6 @@ import Util
 	extern		{ Token _ TokenExtern }
 	model		{ Token _ TokenModel }
 	extend		{ Token _ TokenExtend }
-	with		{ Token _ TokenWith }
 	new		{ Token _ TokenNew }
 	operator	{ Token _ TokenOperator }
 	struct		{ Token _ TokenStruct }
@@ -102,8 +101,8 @@ AnnsMdl	: Ann AnnsMdl			{ ($1 : $2) }
 TParams	: '@' var ',' TParams		{ ($2 : $4) }
 	| '@' var			{ [$2] }
 
-Extend	: extend var with Datatype '{' Funcs '}'			{ Extend $2 [] $4 $6 }
-	| extend var '<' TParams '>' with Datatype '{' Funcs '}'	{ Extend $2 $4 $7 $9 }
+Extend	: extend var ':' Datatype '{' Funcs '}'			{ Extend $2 [] $4 $6 }
+	| extend var '<' TParams '>' ':' Datatype '{' Funcs '}'	{ Extend $2 $4 $7 $9 }
 
 Funcs	: Func Funcs			{ ($1 : $2) }
 	| Func				{ [$1] }

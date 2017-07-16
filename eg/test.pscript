@@ -14,19 +14,19 @@ model Printable {
 	Void print();
 }
 
-extend Int with Printable {
+extend Int : Printable {
 	Void print() {
 		printInt(this);
 	}
 }
 
-extend Str with Printable {
+extend Str : Printable {
 	Void print() {
 		puts(this);
 	}
 }
 
-extend String with Printable {
+extend String : Printable {
 	Void print() {
 		this.toString().print();
 	}
@@ -38,7 +38,7 @@ model Squarable {
 	$ square();
 }
 
-extend Int with Squarable {
+extend Int : Squarable {
 	Int square() {
 		return this*this;
 	}
@@ -50,7 +50,7 @@ model Duplicable {
 	$[] duplicate();
 }
 
-extend Int with Duplicable {
+extend Int : Duplicable {
 	Int[] duplicate() {
 		return [this, this];
 	}
@@ -58,7 +58,7 @@ extend Int with Duplicable {
 
 // Pipes
 
-extend Int with StreamOperation<Int, Void> {
+extend Int : StreamOperation<Int, Void> {
 	Void operator |(StreamSource<Int> source) {
 		var i = source.iterator();
 		while (true) {
@@ -74,7 +74,7 @@ extend Int with StreamOperation<Int, Void> {
 
 const struct Printer<@T> { }
 
-extend Printer<@T> with StreamOperation<@T, Void> {
+extend Printer<@T> : StreamOperation<@T, Void> {
 	Void operator |(StreamSource<@T> source) {
 		var i = source.iterator();
 		while (true) {
@@ -94,7 +94,7 @@ model AddingPrinter<@T> {
 
 const struct AddingPrinterImpl<@T> { @T prefix; }
 
-extend AddingPrinterImpl<@T> with AddingPrinter<@T> {
+extend AddingPrinterImpl<@T> : AddingPrinter<@T> {
 	Void print(@T value) {
 		puts((this.prefix ++ value).toString());
 	}
@@ -125,7 +125,7 @@ Int[] fromTo(Int from, Int to) {
 
 //
 
-extend Int with Summable<Int> {
+extend Int : Summable<Int> {
 	Int operator ++(Int i) {
 		return this + i;
 	}
