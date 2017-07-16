@@ -35,13 +35,16 @@ See DOC.md for more information.
 
 ## Building
 
-Should work with ghc. The parser must be generated using Happy. The program has following dependencies:
+To build the compiler, you need the Happy parser generator and Cabal installed. The program itself has following dependencies:
 
 * base
 * containers
 * directory
 * mtl
 * split
+
+	happy src/Parser.y
+	cabal build
 
 ## Features / TODO
 
