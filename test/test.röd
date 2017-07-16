@@ -13,15 +13,15 @@ function doTest(name, code, eout) {
 		print("module tmp;import core;")
 		print(line) for line in code
 		print("extern import \"stdio.h\";extern Void puts(Str s);Void println(String s)puts(s.toString());")
-	} | writeLines("tmp.pscript")
-	compiler_errors := [{}() | exec(:l, "bash", "-c", "script/compile.sh tmp.pscript 2>&1")]
-	if [ not fileExists("etmp") ] do
+	} | writeStrings("tmp.pscript")
+	compiler_errors := [{}() | bufferedExec("bash", "-c", "script/compile.sh tmp.pscript 2>&1")]
+	unless fileExists("etmp") do
 		{} | exec("mv", "tmp.pscript", "fail.pscript") | {}
 		return new TestReport(name, FALSE,
 			"Compiler error (try to compile manually)\n" .. [push("    "..err) for err in compiler_errors]&"\n")
 	done
-	out := [{}() | exec(:l, "./etmp")]
-	{} | exec("rm", "tmp.ps", "etmp") | {}
+	out := [{}() | bufferedExec("./etmp")]
+	{} | exec("rm", "tmp.pscript", "etmp") | {}
 	if [ #out != #eout ] do
 		{} | exec("mv", "tmp.c", "fail.c") | {}
 		return new TestReport(name, FALSE, "expected "..#eout.." output lines, got "..#out)
@@ -55,15 +55,15 @@ function main(testfile) {
 			name := line[4:]
 			code := []
 			eout := []
-			pull(line)
+			line = pull()
 			until startsWith("==>", line) do
 				code += line
-				pull(line)
+				line = pull()
 			done
-			pull(line)
+			line = pull()
 			until startsWith("---", line) do
 				eout += line
-				pull(line)
+				line = pull()
 			done
 			push("Compiling test "..i.." ("..name..")... ")
 			result := doTest(name, code, eout)
