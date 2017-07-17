@@ -324,7 +324,7 @@ treeToLists decls =
         listStruct = Struct "Array" ["T"] [
             ("len", Typename "Int" []),
             ("ptr", Typename "Pointer" [Typeparam "T"])
-            ] True []
+            ] True [] False
 
         structs = Map.fromList $ ("Array", listStruct) :
                 concatMap (\d -> case d of
@@ -477,8 +477,8 @@ compileDecl (ss, Ext Extend { dtName = n, model = m,
                     }
          )
 compileDecl (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs,
-                                isConst = c }) =
-    when (null tps || not (null ss)) $ do
+                                isConst = c, isExtern = e }) =
+    when (not e && (null tps || not (null ss))) $ do
         etas <- substituteTpList n ss tps
         let dt = PInterface n etas
         lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++

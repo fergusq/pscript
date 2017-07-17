@@ -156,14 +156,15 @@ Params	: Parameter ',' Params		{ ($1 : $3) }
 
 Parameter : Datatype var		{ ($2, $1) }
 
-Struct	: AnnsStc var '{' Fields '}'			{ Struct $2 [] $4 False $1 }
-	| AnnsStc var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 False $1 }
-	| AnnsStc var '<' TParams '>' '{' '}'		{ Struct $2 $4 [] False $1 }
-	| AnnsStc var '{' '}'				{ Struct $2 [] [] False $1 }
-	| AnnsCns struct var '{' Fields '}'			{ Struct $3 [] $5 True $1 }
-	| AnnsCns struct var '<' TParams '>' '{' Fields '}'	{ Struct $3 $5 $8 True $1 }
-	| AnnsCns struct var '<' TParams '>' '{' '}'		{ Struct $3 $5 [] True $1 }
-	| AnnsCns struct var '{' '}'				{ Struct $3 [] [] True $1 }
+Struct	: AnnsStc var '{' Fields '}'			{ Struct $2 [] $4 False $1 False }
+	| AnnsStc var '<' TParams '>' '{' Fields '}'	{ Struct $2 $4 $7 False $1 False }
+	| AnnsStc var '<' TParams '>' '{' '}'		{ Struct $2 $4 [] False $1 False }
+	| AnnsStc var '{' '}'				{ Struct $2 [] [] False $1 False }
+	| AnnsCns struct var '{' Fields '}'			{ Struct $3 [] $5 True $1 False }
+	| AnnsCns struct var '<' TParams '>' '{' Fields '}'	{ Struct $3 $5 $8 True $1 False }
+	| AnnsCns struct var '<' TParams '>' '{' '}'		{ Struct $3 $5 [] True $1 False }
+	| AnnsCns struct var '{' '}'				{ Struct $3 [] [] True $1 False }
+	| extern struct var '{' Fields '}'			{ Struct $3 [] $5 True [] True }
 
 AnnsStc	: Ann AnnsStc			{ ($1 : $2) }
 	| struct			{ [] }
@@ -349,7 +350,8 @@ data Struct = Struct {
 	stcTypeparameters :: [String],
 	stcFields :: [(String, Datatype)],
 	isConst :: Bool,
-	stcAnnotations :: [(String, [String])]
+	stcAnnotations :: [(String, [String])],
+	isExtern :: Bool
 }
 
 data EnumStruct = EnumStruct {
