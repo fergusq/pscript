@@ -214,7 +214,7 @@ ensureStructIsDefined dt =
     case dt of
         -- array tarvitsee oman structinsa
         PInterface "Array" [a] -> do
-            let n = "_Array1" ++ pdt2str a
+            let n = "_PS_Array1" ++ pdt2str a
             conditionallyCreateStruct n $ do
                 lift $ generateSuperSuperHeaderCode
                     ("typedef struct " ++ n ++ " " ++ n ++ ";\n")
@@ -431,7 +431,7 @@ compileDecl (ss, Mdl m) =
         let dt = PInterface mname []
         fs <- mapM (subsFunction Map.empty) $ methods m
         conditionallyCreateStruct (pdt2str dt) $
-            compileStruct dt mname fs
+            compileStruct dt (pdt2str dt) fs
 compileDecl (ss, Ext Extend { dtName = n, model = m,
                                 eMethods = fs, eTypeparameters = tps}) =
     when (null tps || not (null ss)) $ do
@@ -482,7 +482,7 @@ compileDecl (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = 
         etas <- substituteTpList n ss tps
         let dt = PInterface n etas
         when e $
-            lift $ generateSuperSuperHeaderCode ("typedef struct " ++ pdt2str dt ++
+            lift $ generateSuperSuperHeaderCode ("typedef struct " ++ n ++
                                                  (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
         unless e $ do
             lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
@@ -916,7 +916,7 @@ compileExpression expdt (NewStruct dt fieldValues) = do
             (Just cons) <- isConstant pdt
             if not cons
              then do
-                generateCreate pdt var ("alloc(sizeof(struct _"++pdt2str pdt ++ "))")
+                generateCreate pdt var ("alloc(sizeof("++pdt2str pdt ++ "))")
                 forM_ (zip fs fieldvaluecodes) $ \((n, _), c) ->
                     generateAssign (var++"->"++n) c
              else

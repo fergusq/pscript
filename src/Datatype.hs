@@ -51,7 +51,7 @@ pdt2dt (PSum dts) = SumType (map pdt2dt dts)
 pdt2dt PNothing = Typename "<#nothing>" []
 
 ctype :: PDatatype -> String -> String
-ctype (PInterface "Array" [a]) n = "struct _Array1" ++ pdt2str a ++ " " ++ n
+ctype (PInterface "Array" [a]) n = "struct _PS_Array1" ++ pdt2str a ++ " " ++ n
 ctype (PInterface "Pointer" [a]) n = ctype a ('*':n)
 ctype (PInterface "Int" []) n = "int " ++ n
 ctype (PInterface "Long" []) n = "long " ++ n
@@ -69,8 +69,8 @@ cparams [a] = ctype a ""
 cparams (a:as) = ctype a "" ++ ", " ++ cparams as
 
 pdt2str :: PDatatype -> String
-pdt2str (PInterface a []) = a
-pdt2str (PInterface a as) = a ++ show (length as) ++ concatMap pdt2str as
+pdt2str (PInterface a []) = "PS_" ++ a
+pdt2str (PInterface a as) = "PS_" ++ a ++ show (length as) ++ concatMap pdt2str as
 pdt2str (PSum dts) = joinChar '_' (sort $ map pdt2str dts)
 pdt2str PNothing = "<nothing>"
 
