@@ -13,7 +13,6 @@ data TokenClass
 	| TokenExtern
 	| TokenModel
 	| TokenExtend
-	| TokenWith
 	| TokenNew
 	| TokenOperator
 	| TokenStruct
@@ -111,7 +110,7 @@ lexer ln ('"':cs) = lexString ln "" cs
 lexer ln ('\n':cs) = lexer (ln+1) cs
 lexer ln (c:cs)
 	| isSpace c = lexer ln cs
-	| isAlpha c = lexVar ln (c:cs)
+	| isAlpha c || c == '_' = lexVar ln (c:cs)
 	| isDigit c = lexNum ln (c:cs)
 	| otherwise = error ("Illegal character: " ++ [c])
 
@@ -137,7 +136,7 @@ lexNum ln cs = Token ln (TokenInt (read num)) : lexer ln rest
 	where (num,rest) = span isDigit cs
 
 lexVar ln cs =
-	case span isAlphaNum cs of
+	case span (\c -> isAlphaNum c || c == '_') cs of
 		("for",rest)     -> Token ln TokenFor : lexer ln rest
 		("in",rest)      -> Token ln TokenIn : lexer ln rest
 		("var",rest)     -> Token ln TokenVar : lexer ln rest
@@ -148,7 +147,6 @@ lexVar ln cs =
 		("extern",rest)  -> Token ln TokenExtern : lexer ln rest
 		("model",rest)   -> Token ln TokenModel : lexer ln rest
 		("extend",rest)  -> Token ln TokenExtend : lexer ln rest
-		("with",rest)    -> Token ln TokenWith : lexer ln rest
 		("new",rest)     -> Token ln TokenNew : lexer ln rest
 		("operator",rest)-> Token ln TokenOperator : lexer ln rest
 		("struct",rest)  -> Token ln TokenStruct : lexer ln rest
