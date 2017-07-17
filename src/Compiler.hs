@@ -478,16 +478,20 @@ compileDecl (ss, Ext Extend { dtName = n, model = m,
          )
 compileDecl (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = fs,
                                 isConst = c, isExtern = e }) =
-    when (not e && (null tps || not (null ss))) $ do
+    when (null tps || not (null ss)) $ do
         etas <- substituteTpList n ss tps
         let dt = PInterface n etas
-        lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
-                                             (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
-        lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
-        forM_ fs $ \(fname, ftype) -> do
-            ftype' <- substitute' (Just $ "struct field "++show ftype++" "++fname) ss ftype
-            lift $ generateSuperHeaderCode ("\t" ++ ctype ftype' fname ++ ";\n")
-        lift $ generateSuperHeaderCode "};\n"
+        when e $
+            lift $ generateSuperSuperHeaderCode ("typedef struct " ++ pdt2str dt ++
+                                                 (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
+        unless e $ do
+            lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
+                                                 (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
+            lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
+            forM_ fs $ \(fname, ftype) -> do
+                ftype' <- substitute' (Just $ "struct field "++show ftype++" "++fname) ss ftype
+                lift $ generateSuperHeaderCode ("\t" ++ ctype ftype' fname ++ ";\n")
+            lift $ generateSuperHeaderCode "};\n"
 compileDecl (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
                                     enmCases = cs }) =
     when (null tps || not (null ss)) $ do

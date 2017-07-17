@@ -164,7 +164,8 @@ Struct	: AnnsStc var '{' Fields '}'			{ Struct $2 [] $4 False $1 False }
 	| AnnsCns struct var '<' TParams '>' '{' Fields '}'	{ Struct $3 $5 $8 True $1 False }
 	| AnnsCns struct var '<' TParams '>' '{' '}'		{ Struct $3 $5 [] True $1 False }
 	| AnnsCns struct var '{' '}'				{ Struct $3 [] [] True $1 False }
-	| extern struct var '{' Fields '}'			{ Struct $3 [] $5 True [] True }
+	| extern struct var '{' Fields '}'			{ Struct $3 [] $5 False [] True }
+	| extern const struct var '{' Fields '}'		{ Struct $4 [] $6 True [] True }
 
 AnnsStc	: Ann AnnsStc			{ ($1 : $2) }
 	| struct			{ [] }
