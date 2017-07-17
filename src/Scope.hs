@@ -227,13 +227,19 @@ getFields dt = do
     tellError $ show dt ++ " does not have fields"
     return Nothing
 
-isConstant :: PDatatype -> Compiler (Maybe Bool)
-isConstant dt@(PInterface n _) = do
+getStructProperty :: (Struct -> a) -> PDatatype -> Compiler (Maybe a)
+getStructProperty prop dt@(PInterface n _) = do
     scope <- get
     let s = Map.lookup n (structs scope)
     return $ do
         s' <- s
-        return $ isConst s'
+        return $ prop s'
+
+isConstant :: PDatatype -> Compiler (Maybe Bool)
+isConstant = getStructProperty isConst
+
+isExternal :: PDatatype -> Compiler (Maybe Bool)
+isExternal = getStructProperty isExtern
 
 getCases :: PDatatype -> Compiler (Maybe [(String, [PDatatype])])
 getCases dt@(PInterface n _) = do

@@ -481,9 +481,10 @@ compileDecl (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = 
     when (null tps || not (null ss)) $ do
         etas <- substituteTpList n ss tps
         let dt = PInterface n etas
-        when e $
+        when e $ do
             lift $ generateSuperSuperHeaderCode ("typedef struct " ++ n ++
                                                  (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
+            lift $ generateSuperSuperHeaderCode ("typedef struct " ++ n ++ " _" ++ pdt2str dt ++ ";\n")
         unless e $ do
             lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
                                                  (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
@@ -914,9 +915,12 @@ compileExpression expdt (NewStruct dt fieldValues) = do
             var <- tmpVar
             fieldvaluecodes <- checkargs (map snd fs) fieldValues
             (Just cons) <- isConstant pdt
+            (Just ext) <- isExternal pdt
             if not cons
              then do
-                generateCreate pdt var ("alloc(sizeof("++pdt2str pdt ++ "))")
+                if not ext
+                 then generateCreate pdt var ("alloc(sizeof(struct _" ++ pdt2str pdt ++ "))")
+                 else generateCreate pdt var ("alloc(sizeof(_" ++ pdt2str pdt ++ "))") -- _-etuliitteiden versio on typedef varsinaiseen ulkoiseen structiin
                 forM_ (zip fs fieldvaluecodes) $ \((n, _), c) ->
                     generateAssign (var++"->"++n) c
              else
@@ -990,12 +994,25 @@ compileExpression expdt (Ref name) =
         _ -> do
             tellError ("can't infer the type of function reference &" ++ name)
             return ("NOTHING", PNothing)
-compileExpression expdt (Lambda ps' rt' stmt) = do
+compileExpression expdt (Lambda ps'' rt'' stmt) = do
     -- tarkistetaan, että parametrit eivät peitä muuttujia
-    forM_ ps' $ \(n, _) -> do
+    forM_ ps'' $ \(n, _) -> do
         v <- getVar n
         when (isJust v) $ tellError ("lambda parameter `" ++ n
                                      ++ "' shadows an existing variable")
+    -- inferoidaan parametrien ja paluuarvon tyypit odotetusta tyypistä
+    let expOrImp AutoType t = t
+        expOrImp t        _ = t
+    let (ps', rt') = case expdt of
+            PInterface "Func" (ert:eps) ->
+                (map (\((str, dt), pdt) -> (str, expOrImp dt $ pdt2dt pdt)) $ zip ps'' eps, expOrImp rt'' $ pdt2dt ert)
+            _ -> (ps'', rt'')
+    forM_ (("", rt') : ps') $ \(_, dt) ->
+        case dt of
+            AutoType -> do
+                let str = show $ Typename "Func" (rt' : map snd ps')
+                tellError("cannot infer lambda type (result: " ++ str ++ ", hint: " ++ show expdt ++ ")")
+            _ -> return ()
     -- selvitetään muuttujat, jotka lambda kaappaa
     scope <- get
     let currentVariables = Map.toList $ variables $ varscope scope
@@ -1032,7 +1049,7 @@ compileExpression expdt (Lambda ps' rt' stmt) = do
     lift $ generateSubHeaderCode ("\treturn " ++ fn ++ "(" ++ joinComma argcodes ++ ");\n};\n")
     -- luodaan nykyisistä muuttujista olio
     scopev <- tmpVar
-    generateAssign ("struct " ++ sn ++ " *" ++ scopev) ("malloc(sizeof(struct "++sn++"))")
+    generateAssign ("struct " ++ sn ++ " *" ++ scopev) ("alloc(sizeof(struct "++sn++"))")
     forM_ currentVariables $ \(n, dt) ->
         generateAssign (scopev++"->"++n) n
     -- luodaan olio, joka sisältää pointterin muuttujastructiin ja wrapperifunktioon

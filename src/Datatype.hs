@@ -10,6 +10,7 @@ type PVariable = (String, PDatatype)
 data PDatatype = PInterface String [PDatatype]
                | PSum [PDatatype]
                | PDollar
+               | PAuto
                | PNothing deriving (Eq, Ord)
 
 -- PNothing on pseudotyyppi, jonka kääntäjä antaa virheellisille lausekkeille
@@ -27,10 +28,12 @@ ifDollar :: PDatatype -> PDatatype -> PDatatype
 ifDollar PDollar t           = t
 ifDollar (PInterface n ts) t = PInterface n (map (`ifDollar` t) ts)
 ifDollar PNothing _          = PNothing
+ifDollar PAuto t             = PAuto
 
 isPNothing :: PDatatype -> Bool
 isPNothing PNothing = True
 isPNothing PDollar = False
+isPNothing PAuto = False
 isPNothing (PSum ts) = any isPNothing ts
 isPNothing (PInterface _ ts) = any isPNothing ts
 
@@ -44,11 +47,14 @@ dt2pdt :: Datatype -> PDatatype
 dt2pdt (Typename name dts) = PInterface name (map dt2pdt dts)
 dt2pdt (SumType dts) = PSum (map dt2pdt dts)
 dt2pdt DollarType = PDollar
+dt2pdt AutoType = PAuto
 
 pdt2dt :: PDatatype -> Datatype
 pdt2dt (PInterface name dts) = Typename name (map pdt2dt dts)
 pdt2dt (PSum dts) = SumType (map pdt2dt dts)
 pdt2dt PNothing = Typename "<#nothing>" []
+pdt2dt PDollar = DollarType
+pdt2dt PAuto = AutoType
 
 ctype :: PDatatype -> String -> String
 ctype (PInterface "Array" [a]) n = "struct _PS_Array1" ++ pdt2str a ++ " " ++ n
@@ -60,6 +66,8 @@ ctype (PInterface "Char" []) n = "char " ++ n
 ctype (PInterface "Str" []) n = "char*" ++ n
 ctype (PInterface "Void" []) n = "char " ++ n
 ctype PNothing n = "NOTHING " ++ n
+ctype PDollar n = "DOLLAR " ++ n
+ctype PAuto n = "AUTO " ++ n
 ctype dt@(PInterface a ts) n = pdt2str dt ++ " " ++ n -- määritellään typedefinä
 ctype dt@(PSum dts) n = "struct _" ++ pdt2str dt ++ ('*':n)
 
@@ -73,6 +81,8 @@ pdt2str (PInterface a []) = "PS_" ++ a
 pdt2str (PInterface a as) = "PS_" ++ a ++ show (length as) ++ concatMap pdt2str as
 pdt2str (PSum dts) = joinChar '_' (sort $ map pdt2str dts)
 pdt2str PNothing = "<nothing>"
+pdt2str PDollar = "$"
+pdt2str PAuto = "<auto>"
 
 instance Show PDatatype where
     show (PInterface "Array" [a]) = show a ++ "[]"
@@ -81,4 +91,5 @@ instance Show PDatatype where
     show (PInterface a as) = a ++ "<" ++ joinComma (map show as) ++ ">"
     show (PSum dts) = joinChar '&' (sort $ map show dts)
     show PDollar = "$"
+    show PAuto = "<auto>"
     show PNothing = "<nothing>"

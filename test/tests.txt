@@ -202,6 +202,17 @@ Void main() {
 ==>
 printing 3
 ---
+### Passing closure with inferred type
+Void apply(Int->Void closure, Int t) {
+	closure.call(t);
+}
+Void main() {
+	var text = "printing ";
+	apply((i) -> { println(text ++ i); }, 6);
+}
+==>
+printing 6
+---
 ### Mapper function
 Void main() {
 	var list = [1, 2, 3];

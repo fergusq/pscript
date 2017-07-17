@@ -303,8 +303,10 @@ Prim	: int					{ Int $1 }
 	| '[' Args ']'				{ List $2 }
 	| '[' ']'				{ EmptyList }
 	| '[' Exp dotdot Exp ']'		{ Range $2 $4 }
-	| '(' Params ')' arrow Datatype '{' Stmts '}'	{ Lambda $2 $5 $ Block $7 }
+	| '(' LParams ')' arrow Datatype '{' Stmts '}'	{ Lambda $2 $5 $ Block $7 }
 	| '(' ')' arrow Datatype '{' Stmts '}'	{ Lambda [] $4 $ Block $6 }
+	| '(' LParams ')' arrow '{' Stmts '}'	{ Lambda $2 AutoType $ Block $6 }
+	| '(' ')' arrow '{' Stmts '}'		{ Lambda [] AutoType $ Block $5 }
 	| new Datatype '[' Exp ']'		{ NewList $2 $4 }
 	| new Datatype '{' Args '}'		{ NewStruct $2 $4 }
 	| new Datatype '{' '}'			{ NewStruct $2 [] }
@@ -314,6 +316,12 @@ Prim	: int					{ Int $1 }
 	| Preprim as Datatype			{ Cast $3 $1 }
 	| true					{ TrueConstant }
 	| false					{ FalseConstant }
+
+LParams	: LParameter ',' LParams	{ ($1 : $3) }
+	| LParameter			{ [$1] }
+
+LParameter : Datatype var		{ ($2, $1) }
+	| var				{ ($1, AutoType) }
 
 {
 parseError :: [Token] -> a
@@ -376,12 +384,14 @@ data Datatype
 	| SumType [Datatype]
 	| Typeparam String
 	| DollarType
+	| AutoType
 
 instance Show Datatype where
     show (Typename a []) = a
     show (Typename a as) = a ++ "<" ++ joinComma (map show as) ++ ">"
     show (SumType dts) = joinChar '&' (map show dts)
     show DollarType = "$"
+    show AutoType = "<auto>"
     show (Typeparam p) = "@" ++ p
 
 data Statement
