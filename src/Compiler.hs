@@ -1200,10 +1200,15 @@ compileOtherMethodCall dt obj method args
             Nothing -> do
                 p' <- getModelMethod dt method
                 case p' of
-                  Nothing -> do
-                    tellError ("type " ++ show dt ++
-                               " does not have method `" ++ method ++ "'")
-                    return ("NOTHING", PNothing)
+                  Nothing ->
+                    if method == "op_eq" || method == "op_neq"
+                     then do
+                       (var:vars) <- checkargs [dt] args
+                       return ("("++obj++coperator method++var++")", pBool)
+                     else do
+                       tellError ("type " ++ show dt ++
+                                  " does not have method `" ++ method ++ "'")
+                       return ("NOTHING", PNothing)
                   Just p -> do
                     objv <- createTmpVarIfNeeded dt obj
                     compileMethodCall' p (objv++"->"++method) objv dt args
