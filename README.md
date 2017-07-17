@@ -92,6 +92,6 @@ Commands:
   - [x] Variable type inference
   - [x] Type parameter inference
   - [x] List type inference
-  - [ ] Lambda type inference
+  - [x] Lambda type inference
   - [ ] Inference using supertypes
   - [ ] Inference of object type using method parameters
