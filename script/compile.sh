@@ -5,4 +5,4 @@ NAME=`basename "${PSFILE%.*}"`
 CFILE="$NAME".c
 EFILE=e"$NAME"
 
-PScript compile --path lib $PSFILE >$CFILE && gcc -Ofast -o $EFILE $CFILE -lgc
+PScript compile --path lib $PSFILE >$CFILE && gcc $CFLAGS -Ofast -o $EFILE $CFILE -lgc
