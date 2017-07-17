@@ -9,6 +9,12 @@ extern struct SDL_Surface {
 	Int h;
 }
 
+extend SDL_Surface : String {
+	Str toString() {
+		return "SDL_Surface {}";
+	}
+}
+
 extern struct SDL_Rect {
 	Int x;
 	Int y;
@@ -25,20 +31,88 @@ extern Void SDL_FreeSurface(SDL_Surface surface);
 extern Void SDL_Delay(Int time);
 extern Void SDL_Quit();
 
+model Application {
+	Void quit();
+	
+	Sprite loadSprite(String filename, Int width, Int height);
+	Void drawSprites();
+}
+
+struct SDLApplication {
+	SDL_Surface surface;
+	ArrayList<SDL_Surface> textures;
+	ArrayList<Sprite> sprites;
+}
+
+extend SDLApplication : Application {
+	Void quit() {
+		for (texture in this.textures.elements) SDL_FreeSurface(texture);
+		SDL_Quit();
+	}
+	
+	Sprite loadSprite(String filename, Int width, Int height) {
+		// TODO: cache textures
+		var texture = SDL_LoadBMP(filename.toString());
+		this.textures.push(texture);
+		
+		var sprite = new Sprite { 0, 0, width, height, texture };
+		this.sprites.push(sprite);
+		
+		return sprite;
+	}
+	
+	Void drawSprites() {
+		for (sprite in this.sprites.elements) {
+			var area = new SDL_Rect { sprite.x, sprite.y, sprite.width, sprite.height };
+			SDL_BlitSurface(sprite.texture, 0, this.surface, area);
+		}
+		SDL_Flip(this.surface);
+	}
+}
+
+SDLApplication createSDLApplication(Int width, Int height) {
+	SDL_Init(32);
+	return new SDLApplication {
+		SDL_SetVideoMode(width, height, 32, 1073741825),
+		createArrayList(),
+		createArrayList()
+	};
+}
+
+struct Sprite {
+	Int x;
+	Int y;
+	Int width;
+	Int height;
+	SDL_Surface texture;
+}
+
+extend Sprite : String {
+	Str toString() {
+		return "Sprite {}";
+	}
+}
+
+extend Sprite : Eq<Sprite> {
+	Bool operator ==(Sprite s) {
+		return this.x == s.x && this.y == s.y
+			&& this.width == s.width
+			&& this.height == s.height;
+	}
+	Bool operator !=(Sprite s) {
+		return !(this == s);
+	}
+}
+
 Void main(Int argc, Str* argv) {
 	var args = new Array<Str> { argc, argv };
-	SDL_Init(32);
-	var surface = SDL_SetVideoMode(1024, 768, 32, 1073741825);
-	var logo = SDL_LoadBMP("logo.bmp");
-	var area = new SDL_Rect { 100, 100, 100, 100 };
+	var app = createSDLApplication(1024, 768);
+	var logo = app.loadSprite("logo.bmp", 100, 100);
 	for (i in [1 .. 200]) {
-		area.x = i*i/100;
-		area.y = (i-3)*(i-3)/100;
-		SDL_BlitSurface(logo, 0, surface, area);
-		SDL_Flip(surface);
+		logo.x = i*i/100;
+		logo.y = (i-3)*(i-3)/100;
+		app.drawSprites();
 		SDL_Delay(10);
 	}
-	SDL_FreeSurface(logo);
-	SDL_Delay(5000);
-	SDL_Quit();
+	app.quit();
 }
