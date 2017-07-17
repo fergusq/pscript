@@ -203,12 +203,12 @@ Void main() {
 printing 3
 ---
 ### Passing closure with inferred type
-Void apply(Int->Void closure, Int t) {
-	closure.call(t);
+Str apply(Int->Str closure, Int t) {
+	return closure.call(t);
 }
 Void main() {
 	var text = "printing ";
-	apply((i) -> { println(text ++ i); }, 6);
+	println(apply((i) -> text ++ i, 6));
 }
 ==>
 printing 6

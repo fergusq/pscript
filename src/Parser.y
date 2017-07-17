@@ -307,6 +307,8 @@ Prim	: int					{ Int $1 }
 	| '(' ')' arrow Datatype '{' Stmts '}'	{ Lambda [] $4 $ Block $6 }
 	| '(' LParams ')' arrow '{' Stmts '}'	{ Lambda $2 AutoType $ Block $6 }
 	| '(' ')' arrow '{' Stmts '}'		{ Lambda [] AutoType $ Block $5 }
+	| '(' LParams ')' arrow Exp		{ Lambda $2 AutoType $ Block [Return $5] }
+	| '(' ')' arrow Exp			{ Lambda [] AutoType $ Block [Return $4] }
 	| new Datatype '[' Exp ']'		{ NewList $2 $4 }
 	| new Datatype '{' Args '}'		{ NewStruct $2 $4 }
 	| new Datatype '{' '}'			{ NewStruct $2 [] }
