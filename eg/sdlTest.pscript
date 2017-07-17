@@ -1,0 +1,44 @@
+module sdlTest;
+
+import core;
+
+extern import "SDL/SDL.h";
+
+extern struct SDL_Surface {
+	Int w;
+	Int h;
+}
+
+extern struct SDL_Rect {
+	Int x;
+	Int y;
+	Int w;
+	Int h;
+}
+
+extern Int SDL_Init(Int flags);
+extern SDL_Surface SDL_SetVideoMode(Int x, Int y, Int c, Int flags);
+extern SDL_Surface SDL_LoadBMP(Str filename);
+extern Void SDL_BlitSurface(SDL_Surface image, Int i, SDL_Surface surface, SDL_Rect area);
+extern Void SDL_Flip(SDL_Surface surface);
+extern Void SDL_FreeSurface(SDL_Surface surface);
+extern Void SDL_Delay(Int time);
+extern Void SDL_Quit();
+
+Void main(Int argc, Str* argv) {
+	var args = new Array<Str> { argc, argv };
+	SDL_Init(32);
+	var surface = SDL_SetVideoMode(1024, 768, 32, 1073741825);
+	var logo = SDL_LoadBMP("logo.bmp");
+	var area = new SDL_Rect { 100, 100, 100, 100 };
+	for (i in [1 .. 200]) {
+		area.x = i*i/100;
+		area.y = (i-3)*(i-3)/100;
+		SDL_BlitSurface(logo, 0, surface, area);
+		SDL_Flip(surface);
+		SDL_Delay(10);
+	}
+	SDL_FreeSurface(logo);
+	SDL_Delay(5000);
+	SDL_Quit();
+}
