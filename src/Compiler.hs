@@ -135,6 +135,15 @@ checktype v f right@(PInterface "Str" []) (PInterface "Pointer" [PInterface "Cha
 -- muunnos Str -> Char*
 checktype v f right@(PInterface "Pointer" [PInterface "Char" []]) (PInterface "Str" []) =
     generateCreate right v f
+-- muunnos Int -> Float
+checktype v f right@(PInterface "Float" []) (PInterface "Int" []) =
+    generateCreate right v f
+-- muunnos Int -> Long
+checktype v f right@(PInterface "Long" []) (PInterface "Int" []) =
+    generateCreate right v f
+-- muunnos Float -> Int
+checktype v f right@(PInterface "Int" []) (PInterface "Float" []) =
+    generateCreate right v f
 -- muut muunnokset
 checktype v f right cand = do
     -- varmistetaan, että tyypin laajennokset on generoitu
@@ -1123,6 +1132,10 @@ compileMethodCall dt@(PInterface "Int" []) obj method args
 
 -- PLong
 compileMethodCall dt@(PInterface "Long" []) obj method args
+    = compileIntLikeMethodCall dt obj method args
+
+-- PFloat
+compileMethodCall dt@(PInterface "Float" []) obj method args
     = compileIntLikeMethodCall dt obj method args
 
 -- PChar

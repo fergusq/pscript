@@ -19,6 +19,7 @@ pArray a = PInterface "Array" [a]
 pPointer a = PInterface "Pointer" [a]
 pInteger = PInterface "Int" []
 pLong = PInterface "Long" []
+pFloat = PInterface "Float" []
 pChar = PInterface "Char" []
 pBool = PInterface "Bool" []
 pString = PInterface "Str" []
@@ -60,7 +61,8 @@ ctype :: PDatatype -> String -> String
 ctype (PInterface "Array" [a]) n = "struct _PS_Array1" ++ pdt2str a ++ " " ++ n
 ctype (PInterface "Pointer" [a]) n = ctype a ('*':n)
 ctype (PInterface "Int" []) n = "int " ++ n
-ctype (PInterface "Long" []) n = "long " ++ n
+ctype (PInterface "Long" []) n = "long long " ++ n
+ctype (PInterface "Float" []) n = "double " ++ n
 ctype (PInterface "Bool" []) n = "int " ++ n
 ctype (PInterface "Char" []) n = "char " ++ n
 ctype (PInterface "Str" []) n = "char*" ++ n

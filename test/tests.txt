@@ -5,6 +5,18 @@ Void main() {
 ==>
 4
 ---
+### Floats
+Void main() {
+	var two3 = 2 as Float / 3;
+	var half = 1 as Float / 2;
+	var fourth = 1 as Float / 4;
+	println(two3 > half);
+	println(half > fourth);
+}
+==>
+true
+true
+---
 ### Variable creation
 Void main() {
 	var i = 2 + 3;
