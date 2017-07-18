@@ -1,6 +1,7 @@
 module core;
 
 extern import "stdlib.h";
+extern import "string.h";
 
 extern Int strcmp(Str a, Str b);
 extern Void strcpy(Str d, Str s);
@@ -936,6 +937,10 @@ extend ArrayList<@T> : Copyable {
 	ArrayList<@T> copy() {
 		return new ArrayList<@T> { this.elements.copy() };
 	}
+}
+
+ArrayList<@T> createArrayList<@T>() {
+	return new ArrayList<@T> { [] };
 }
 
 // OPTIONAL

@@ -23,5 +23,8 @@ Void main() {
 
 Void println(String str) puts(str.toString());
 
+extern import "stdio.h";
+extern import "time.h";
+
 extern Void puts(Str str);
 extern Int clock();
