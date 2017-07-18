@@ -29,6 +29,7 @@ extern Void SDL_BlitSurface(SDL_Surface image, Int i, SDL_Surface surface, SDL_R
 extern Void SDL_Flip(SDL_Surface surface);
 extern Void SDL_FreeSurface(SDL_Surface surface);
 extern Void SDL_Delay(Int time);
+extern Int SDL_GetTicks();
 extern Void SDL_Quit();
 
 model Application {
@@ -104,15 +105,62 @@ extend Sprite : Eq<Sprite> {
 	}
 }
 
+model Updater {
+	Bool isRunning();
+	Void updateWorld(Int n, Float time);
+	Void updateSprites(Int n, Float time);
+}
+
 Void main(Int argc, Str* argv) {
 	var args = new Array<Str> { argc, argv };
 	var app = createSDLApplication(1024, 768);
-	var logo = app.loadSprite("logo.bmp", 100, 100);
-	for (i in [1 .. 200]) {
-		logo.x = i*i/100;
-		logo.y = (i-3)*(i-3)/100;
+	
+	var updateInterval = 1000; // 1 s
+	var updates = 0;
+	var startTime = SDL_GetTicks();
+	
+	var updater = new MyUpdater { app.loadSprite("logo.bmp", 100, 100), true };
+	while (updater.isRunning()) {
+		var time = SDL_GetTicks();
+		var timeSinceStart = (time-startTime);
+		var modTime = (timeSinceStart % updateInterval) as Float / updateInterval;
+		
+		while (timeSinceStart / updateInterval > updates) {
+			updates = updates + 1;
+			updater.updateWorld(updates, modTime);
+		}
+		
+		updater.updateSprites(updates, modTime);
 		app.drawSprites();
-		SDL_Delay(10);
+		SDL_Delay(1);
 	}
 	app.quit();
 }
+
+struct MyUpdater {
+	Sprite logo;
+	Bool running;
+}
+
+extend MyUpdater : Updater {
+	Bool isRunning() {
+		return this.running;
+	}
+	Void updateWorld(Int update, Float time) {
+		this.running = update <= 10;
+	}
+	Void updateSprites(Int update, Float time) {
+		var t = (time+update)*10;
+		this.logo.x = t*10;
+		t = t*t;
+		var i = t as Int % 434;
+		if (t as Int / 434 % 2 == 0) {
+			this.logo.y = i;
+		} else {
+			this.logo.y = 434-i;
+		}
+	}
+}
+
+//extern import "stdio.h";
+//extern Void puts(Str str);
