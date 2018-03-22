@@ -990,8 +990,8 @@ extend ArrayList<@T> : Copyable {
 
 // MAP
 
-model Map<@K, @V> : Container<@T> {
-	@V get(@K key);
+model Map<@K, @V> {
+	@V? get(@K key);
 }
 
 model MutableMap<@K, @V> : Map<@K, @V> {
@@ -1009,17 +1009,39 @@ Pair<@K, @V> createPair<@K, @V>(@K first, @V second) {
 	return new Pair<@K, @V> { first, second };
 }
 
+extend Pair<@K, @V> : String {
+	Str toString() {
+		return "(" ++ this.first ++ ", " ++ this.second ++ ")";
+	}
+}
+
 struct HashMap<@K, @V> {
 	ArrayList<Pair<@K, @V>>[] buckets;
 }
 
+HashMap<@K, @V> createHashMap<@K, @V>() {
+	return createHashMapWithSize::<@K, @V>(500);
+}
+
+HashMap<@K, @V> createHashMapWithSize<@K, @V>(Int size) {
+	var buckets = new ArrayList<Pair<@K, @V>>[size];
+	for (i in [0 .. buckets.size()-1]) {
+		buckets[i] = createArrayList();
+	}
+	return new HashMap<@K, @V> { buckets };
+}
+
 extend HashMap<@K, @V> : Map<@K, @V> {
-	@V get(@K key) {
+	@V? get(@K key) {
 		var hash = key.hash();
 		var bucket = this.buckets[hash%this.buckets.size()];
-		for (pair in bucket) {
-			if (pair.first == key) {
-				return just(pair.second);
+		var iter = bucket.iterator();
+		while (true) {
+			match (iter.next()) {
+				Just(pair) -> if (pair.first == key) {
+					return just(pair.second);
+				}
+				Nothing -> break;
 			}
 		}
 		return nothing();
@@ -1031,11 +1053,15 @@ extend HashMap<@K, @V> : MutableMap<@K, @V> {
 		var hash = key.hash();
 		var bucket = this.buckets[hash%this.buckets.size()];
 		var found = false;
-		for (pair in bucket) {
-			if (pair.first == key) {
-				pair.second = value;
-				found = true;
-				break;
+		var iter = bucket.iterator();
+		while (true) {
+			match (iter.next()) {
+				Just(pair) -> if (pair.first == key) {
+					pair.second = value;
+					found = true;
+					break;
+				}
+				Nothing -> break;
 			}
 		}
 		if (!found) {
