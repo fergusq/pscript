@@ -4,6 +4,7 @@ function startsWith(needle, haystack) {
 
 record TestReport(test_name, status, message) {
 	test_name : string = test_name
+	num : integer = -1
 	status : boolean = status
 	message : string = message
 }
@@ -47,7 +48,8 @@ function inColor(color, text) {
 	push("\x1b["..color.."m" .. text .. "\x1b[0m")
 }
 
-function main(testfile) {
+function main(testfile, test_nums...) {
+	test_nums = [test_nums() | parseInteger(_)]
 	results := []
 	i := 1
 	readLines(testfile) | for line do
@@ -65,17 +67,19 @@ function main(testfile) {
 				eout += line
 				line = pull()
 			done
-			push("Compiling test "..i.." ("..name..")... ")
-			result := doTest(name, code, eout)
-			print("["..if[result.status]do["OK"];else[inColor("1;31", "FAILED")]done.."]")
-			results += result
+			if [ #test_nums = 0 or i in test_nums ] do
+				push("Compiling test "..i.." ("..name..")... ")
+				result := doTest(name, code, eout)
+				result.num = i
+				print("["..if[result.status]do["OK"];else[inColor("1;31", "FAILED")]done.."]")
+				results += result
+			done
 			i ++
 		else
 			error("syntax error: `" .. line .. "'") unless [ line =~ "\\s*" ]
 		done
 	done
 	print(inColor("1;30", "---"))
-	i := 1
 	succs := 0
 	fails := 0
 	failtexts := []
@@ -83,10 +87,9 @@ function main(testfile) {
 		if [ test.status ] do
 			succs ++
 		else
-			failtexts += "  Test "..i.." ("..test.test_name.."): "..test.message
+			failtexts += "  Test "..test.num.." ("..test.test_name.."): "..test.message
 			fails ++
 		done
-		i ++
 	done
 	if [ fails > 0 ] do
 		print(inColor("1", "Some tests failed:"))
