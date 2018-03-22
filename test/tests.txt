@@ -177,8 +177,8 @@ Void main() {
 ---
 ### ArrayLists
 Void main() {
-	var a = new ArrayList<Int> { [3, 2, 1] };
-	var b = new ArrayList<Int> { [2, 3, 4] }.append(6);
+	var a = arrayToArrayList([3, 2, 1]);
+	var b = arrayToArrayList([2, 3, 4]).append(6);
 	a.push(7);
 	b[1] = b.remove(2);
 	println(a ++ b);
@@ -256,7 +256,7 @@ Void main() {
 	var list = [4, 3, 2];
 	var mapper = (Int i) -> Int { return i*i; };
 	var printer = (Int i) -> Void { println(i); };
-	var array = list | mapper | new ArrayList<Int> { new Int[0] }.collect();
+	var array = list | mapper | arrayToArrayList(new Int[0]).collect();
 	array[1] = 8;
 	array | forEach(printer);
 }
