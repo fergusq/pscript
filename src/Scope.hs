@@ -9,15 +9,16 @@ import Control.Arrow
 import Data.Maybe
 import qualified Data.Map as Map
 
+data CodeFragment = CodeFragment Int String deriving Eq
+
+instance Ord CodeFragment where
+    compare (CodeFragment a _) (CodeFragment b _) = compare a b
+
 data ErrorSeverity = ENote | EWarn | EErr
 data ErrorMsg = ErrorMsg ErrorSeverity String String
 
-type Generator = WriterT [String] -- koodi
-                 (WriterT [String] -- headeri funktiomäärityksille
-                 (WriterT [String] -- headeri funktioille
-                 (WriterT [String] -- headeri structeille
-                 (WriterT [String] -- headeri typedefeille
-                 (Writer [ErrorMsg])))))
+type Generator = WriterT [CodeFragment]
+                 (Writer [ErrorMsg])
 type Compiler a = StateT Scope Generator a
 
 type Subs = Map.Map String PDatatype
@@ -294,19 +295,19 @@ conditionallyCreateExtend n callback = do
 
 tellError :: String -> Compiler ()
 tellError msg = do fname <- getCurrentFunctionName
-                   lift . lift . lift . lift . lift . lift $
+                   lift . lift $
                     tell [ErrorMsg EErr ("in " ++ fname) msg]
 
 tellWarning :: String -> Compiler ()
 tellWarning msg =
     unlessM (noWarnings . varscope <$> get) $ do
         fname <- getCurrentFunctionName
-        lift . lift . lift . lift . lift . lift $
+        lift . lift $
             tell [ErrorMsg EWarn ("in " ++ fname) msg]
 
 tellNote :: String -> Compiler ()
 tellNote msg = do fname <- getCurrentFunctionName
-                  lift . lift . lift . lift . lift . lift $
+                  lift . lift $
                     tell [ErrorMsg ENote ("in " ++ fname) msg]
 
 generateLater :: Compiler () -> Compiler ()

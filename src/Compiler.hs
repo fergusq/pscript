@@ -19,96 +19,100 @@ generateFunction :: PDatatype -> String -> [(String, PDatatype)] -> Compiler ()
 generateFunction rtype name params
     = do let paramS = joinComma $ map (\(n,t) -> ctype t n) params
              name' = name ++ "(" ++ paramS ++ ")"
-         lift $ tell [ctype rtype name', "{\n"]
+         lift . tell $ map (CodeFragment 500) [ctype rtype name', "{\n"]
 
 generateIf :: String -> Compiler () -> Compiler ()
 generateIf cond callback = do
-    lift $ tell ["\tif(", cond, "){\n"]
+    lift . tell $ map (CodeFragment 500) ["\tif(", cond, "){\n"]
     callback
     generateEnd
 
 generateElseIf :: String -> Compiler () -> Compiler ()
 generateElseIf cond callback = do
-    lift $ tell ["\telse if(", cond, "){\n"]
+    lift . tell $ map (CodeFragment 500) ["\telse if(", cond, "){\n"]
     callback
     generateEnd
 
 generateWhile :: String -> Compiler () -> Compiler ()
 generateWhile cond callback = do
-    lift $ tell ["\twhile(", cond, "){\n"]
+    lift . tell $ map (CodeFragment 500) ["\twhile(", cond, "){\n"]
     callback
     generateEnd
 
 generateBreak :: Compiler ()
 generateBreak =
-    lift $ tell ["break;\n"]
+    lift . tell $ map (CodeFragment 500) ["break;\n"]
 
 generateContinue :: Compiler ()
 generateContinue =
-    lift $ tell ["continue;\n"]
+    lift . tell $ map (CodeFragment 500) ["continue;\n"]
 
 generateElse :: Compiler  ()
 generateElse
-    = lift $ tell ["\t}else{\n"]
+    = lift . tell $ map (CodeFragment 500) ["\t}else{\n"]
 
 generateEnd :: Compiler ()
 generateEnd
-    = lift $ tell ["\t}\n"]
+    = lift . tell $ map (CodeFragment 500) ["\t}\n"]
 
 generateCreate :: PDatatype -> String -> String -> Compiler ()
 generateCreate dt var value
-    = do lift $ tell ["\t", ctype dt var,"=",value,";\n"]
+    = do lift . tell $ map (CodeFragment 500) ["\t", ctype dt var,"=",value,";\n"]
          ensureStructIsDefined dt -- varmistetaan, että kaikki tyypin käsittelemiseen
                                   -- tarvittavat c-tietorakenteet ja funktiot on generoitu
 
 generateVarDecl :: PDatatype -> String -> Compiler ()
 generateVarDecl dt var
-    = do lift $ tell ["\t", ctype dt var,";\n"]
+    = do lift . tell $ map (CodeFragment 500) ["\t", ctype dt var,";\n"]
          ensureStructIsDefined dt
 
 generateAssign :: String -> String -> Compiler ()
 generateAssign var value
-    = tell ["\t",var,"=",value,";\n"]
+    = lift . tell $ map (CodeFragment 500) ["\t",var,"=",value,";\n"]
 
 generateReturn :: String -> Compiler ()
 generateReturn value
-    = tell ["\treturn ", value, ";\n"]
+    = lift . tell $ map (CodeFragment 500) ["\treturn ", value, ";\n"]
 
 generateCode :: String -> Generator ()
 generateCode code
-    = tell [code]
+    = tell [CodeFragment 500 code]
 
 generateVarHeader :: PDatatype -> String -> Generator ()
 generateVarHeader dt name
-    = lift . lift $ tell [ctype dt name ++ ";\n"]
+    = tell [CodeFragment 300 $ ctype dt name ++ ";\n"]
 
 generateFunctionHeader :: PDatatype -> [PDatatype] -> String -> Generator ()
 generateFunctionHeader r ps name
-    = lift . lift $ tell [ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
+    = tell [CodeFragment 300 $ ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
 
 generateExternHeader :: PDatatype -> String -> Generator ()
 generateExternHeader dt name
-    = lift . lift $ tell ["extern " ++ ctype dt name ++ ";\n"]
+    = tell [CodeFragment 300 $ "extern " ++ ctype dt name ++ ";\n"]
 
 generateExternFunctionHeader :: PDatatype -> [PDatatype] -> String -> Generator ()
 generateExternFunctionHeader r ps name
-    = lift . lift $ tell ["extern " ++ ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
+    = tell [CodeFragment 300 $ "extern " ++ ctype r (name ++ "(" ++ cparams ps ++ ")") ++ ";\n"]
 
 generateSubHeaderCode :: String -> Generator ()
 generateSubHeaderCode code
-    = lift $ tell [code]
+    = tell [CodeFragment 400 code]
 
 generateHeaderCode :: String -> Generator ()
 generateHeaderCode code
-    = lift . lift $ tell [code]
+    = tell [CodeFragment 300 code]
 
-generateSuperHeaderCode :: String -> Generator ()
-generateSuperHeaderCode code
-    = lift . lift . lift $ tell [code]
+generateStructHeaderCode :: String -> Generator ()
+generateStructHeaderCode code
+    = tell [CodeFragment 200 code]
 
-generateSuperSuperHeaderCode :: String -> Generator ()
-generateSuperSuperHeaderCode code
-    = lift . lift . lift . lift $ tell [code]
+generateConstStructHeaderCode :: String -> Generator ()
+generateConstStructHeaderCode code
+    = tell [CodeFragment 150 code]
+
+generateTypedefHeaderCode :: String -> Generator ()
+generateTypedefHeaderCode code
+    = tell [CodeFragment 100 code]
 
 -- Apufunktioita tyyppien tarkistamiseen ja virheisiin
 
@@ -228,16 +232,16 @@ ensureStructIsDefined dt =
         PInterface "Array" [a] -> do
             let n = "_PS_Array1" ++ pdt2str a
             conditionallyCreateStruct n $ do
-                lift $ generateSuperSuperHeaderCode
+                lift $ generateTypedefHeaderCode
                     ("typedef struct " ++ n ++ " " ++ n ++ ";\n")
-                lift $ generateSuperHeaderCode
+                lift $ generateConstStructHeaderCode
                     ("struct "++n++"{int len;" ++ ctype a "*ptr" ++ ";};\n")
         PInterface "Func" (rt:ps) -> do
             let n = pdt2str dt
             conditionallyCreateStruct n $ do
-                lift $ generateSuperSuperHeaderCode
+                lift $ generateTypedefHeaderCode
                     ("typedef struct " ++ n ++ " " ++ n ++ ";\n")
-                lift $ generateSuperHeaderCode
+                lift $ generateConstStructHeaderCode
                     ("struct "++n++"{void* scope;"
                      ++ ctype rt "(*func)(" ++ joinComma ("void*":map (`ctype` "") ps)
                      ++ ");};\n")
@@ -351,9 +355,9 @@ treeToLists decls =
 compile :: [Declaration] -> Generator ()
 compile decls = do
     let (functions, models, supers, structs, enums) = treeToLists decls
-    generateSuperHeaderCode "#include <stdlib.h>\n"
-    generateSuperHeaderCode "#include <gc.h>\n"
-    generateSuperHeaderCode "void * alloc(size_t x) { return GC_malloc(x); }\n"
+    generateStructHeaderCode "#include <stdlib.h>\n"
+    generateStructHeaderCode "#include <gc.h>\n"
+    generateStructHeaderCode "void * alloc(size_t x) { return GC_malloc(x); }\n"
     let scope = Scope {
       varscope = VarScope {
         functionName = "",
@@ -391,7 +395,7 @@ compile decls = do
 compileDecl :: (Subs, Declaration)
                -> Compiler ()
 compileDecl (ss, ExIm str) =
-    lift $ generateSuperSuperHeaderCode ("#include <" ++ str ++ ">\n")
+    lift $ generateTypedefHeaderCode ("#include <" ++ str ++ ">\n")
 compileDecl (ss, Func decl@Function { name = fname, parameters = params,
                                             returnType=rtype, body = Extern })
     = return () -- funktio pitäisi includoida extern import -komennolla
@@ -494,40 +498,41 @@ compileDecl (ss, Stc Struct { stcName = n, stcTypeparameters = tps, stcFields = 
         etas <- substituteTpList n ss tps
         let dt = PInterface n etas
         when e $ do
-            lift $ generateSuperSuperHeaderCode ("typedef struct " ++ n ++
+            lift $ generateTypedefHeaderCode ("typedef struct " ++ n ++
                                                  (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
-            lift $ generateSuperSuperHeaderCode ("typedef struct " ++ n ++ " _" ++ pdt2str dt ++ ";\n")
+            lift $ generateTypedefHeaderCode ("typedef struct " ++ n ++ " _" ++ pdt2str dt ++ ";\n")
         unless e $ do
-            lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++
+            lift $ generateTypedefHeaderCode ("typedef struct _" ++ pdt2str dt ++
                                                  (if c then " " else "* ") ++ pdt2str dt ++ ";\n")
-            lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
+            let generate = if c then generateConstStructHeaderCode else generateStructHeaderCode
+            lift $ generate ("struct _" ++ pdt2str dt ++ "{\n")
             forM_ fs $ \(fname, ftype) -> do
                 ftype' <- substitute' (Just $ "struct field "++show ftype++" "++fname) ss ftype
-                lift $ generateSuperHeaderCode ("\t" ++ ctype ftype' fname ++ ";\n")
-            lift $ generateSuperHeaderCode "};\n"
+                lift $ generate ("\t" ++ ctype ftype' fname ++ ";\n")
+            lift $ generate "};\n"
 compileDecl (ss, Enm EnumStruct { enmName = n, enmTypeparameters = tps,
                                     enmCases = cs }) =
     when (null tps || not (null ss)) $ do
         etas <- substituteTpList n ss tps
         let dt = PInterface n etas
-        lift $ generateSuperHeaderCode ("enum e_" ++ pdt2str dt ++ " {\n")
+        lift $ generateStructHeaderCode ("enum e_" ++ pdt2str dt ++ " {\n")
         forM_ cs $ \(cname, _) ->
-            lift $ generateSuperHeaderCode ("\t" ++ pdt2str dt ++ "_" ++ cname ++ ",\n")
-        lift $ generateSuperHeaderCode "};\n"
-        lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ pdt2str dt ++ " "
+            lift $ generateStructHeaderCode ("\t" ++ pdt2str dt ++ "_" ++ cname ++ ",\n")
+        lift $ generateStructHeaderCode "};\n"
+        lift $ generateTypedefHeaderCode ("typedef struct _" ++ pdt2str dt ++ " "
                                              ++ pdt2str dt ++ ";\n")
-        lift $ generateSuperHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
-        lift $ generateSuperHeaderCode ("\tenum e_" ++ pdt2str dt ++ " _type;\n")
-        lift $ generateSuperHeaderCode "\tunion {\n"
+        lift $ generateStructHeaderCode ("struct _" ++ pdt2str dt ++ "{\n")
+        lift $ generateStructHeaderCode ("\tenum e_" ++ pdt2str dt ++ " _type;\n")
+        lift $ generateStructHeaderCode "\tunion {\n"
         forM_ cs $ \(cname, ftypes) -> do
-            lift $ generateSuperHeaderCode "\t\tstruct {\n"
+            lift $ generateStructHeaderCode "\t\tstruct {\n"
             forM_ (zip [1..] ftypes) $ \(i, ftype) -> do
                 ftype' <- substitute' (Just $ "type of enum case field "++cname++":"++show i)
                     ss ftype
-                lift $ generateSuperHeaderCode ("\t\t\t" ++ ctype ftype' ("_k"++show i)
+                lift $ generateStructHeaderCode ("\t\t\t" ++ ctype ftype' ("_k"++show i)
                                                 ++ ";\n")
-            lift $ generateSuperHeaderCode ("\t\t} "++cname++";\n")
-        lift $ generateSuperHeaderCode "\t};\n};\n"
+            lift $ generateStructHeaderCode ("\t\t} "++cname++";\n")
+        lift $ generateStructHeaderCode "\t};\n};\n"
 
 substituteTpList :: String -> Subs -> [String] -> Compiler [PDatatype]
 substituteTpList n ss tps = case forM tps (`Map.lookup` ss) of
@@ -545,22 +550,22 @@ substituteTpList n ss tps = case forM tps (`Map.lookup` ss) of
 -- generoi malli- tai intersektiotyypin structin
 compileStruct :: PDatatype -> String -> [FSignature] -> Compiler ()
 compileStruct dt mname methods = do
-    lift $ generateSuperSuperHeaderCode ("typedef struct _" ++ mname ++ "* " ++
+    lift $ generateTypedefHeaderCode ("typedef struct _" ++ mname ++ "* " ++
                                          mname ++ ";\n")
-    lift $ generateSuperHeaderCode ("struct _" ++ mname ++ "{\n")
+    lift $ generateStructHeaderCode ("struct _" ++ mname ++ "{\n")
     -- generoidaan vtable
     forM_ methods $ \f ->
         let r = sreturnType f `ifDollar` dt
             ps = dt : map snd (sparameters f)
-        in lift $ generateSuperHeaderCode ("\t" ++
+        in lift $ generateStructHeaderCode ("\t" ++
             ctype r ('(':'*':sname f ++ ")(" ++ cparams ps ++ ")") ++ ";\n")
     -- generoidaan kombinaatioiden oliot
     case dt of
         PSum dts -> forM_ (combinations dts) $ \c ->
-            lift $ generateSuperHeaderCode ("\t" ++ ctype (sumOrModel c) (concatMap pdt2str c)
+            lift $ generateStructHeaderCode ("\t" ++ ctype (sumOrModel c) (concatMap pdt2str c)
                                        ++ ";\n")
         _ -> return ()
-    lift $ generateSuperHeaderCode "\tvoid *_obj;\n};\n"
+    lift $ generateStructHeaderCode "\tvoid *_obj;\n};\n"
 
 -- generoi funktion, joka ottaa malli- tai intersektiotyypin sekä argumentteja
 -- ja muuntaa mallin tai intersektion oikeaan muotoon dereferoimalla _obj-kentän
@@ -639,6 +644,17 @@ compileStatement Break =
     generateBreak
 compileStatement Continue =
     generateContinue
+compileStatement (For name (Range from to) body)
+    = do fromv <- compileExpressionAs pInteger from
+         tov' <- compileExpressionAs pInteger to
+         tov <- createTmpVarIfNeeded pInteger tov'
+         generateCreate pInteger name fromv
+         generateWhile (name++"<="++tov) $ do
+             scope <- saveScope
+             putVar name pInteger
+             compileStatement body
+             generateAssign name (name ++ "+1")
+             restoreScope scope
 compileStatement (For name expr body)
     = do (var, dt) <- compileExpression (pArray PNothing) expr
          ctr <- tmpVar

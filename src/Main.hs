@@ -4,6 +4,7 @@ import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.State
 import qualified Data.Map as Map
+import Data.List
 import Data.List.Split
 import System.IO
 import System.Exit
@@ -52,14 +53,10 @@ parseModulesRecursively searchPath files = do
 compileCode :: [FilePath] -> [String] -> IO ()
 compileCode searchPath files = do
     tree <- parseModulesRecursively searchPath files
-    let ((((((_, code0), code1), header0), header1), header2), errors) =
-         runWriter $ runWriterT $ runWriterT $ runWriterT $ runWriterT $ runWriterT $
+    let ((_, code), errors) =
+         runWriter $ runWriterT $
             compile tree
-    forM_ header2 putStr
-    forM_ header1 putStr
-    forM_ header0 putStr
-    forM_ code1 putStr
-    forM_ code0 putStr
+    forM_ (sort code) $ \(CodeFragment _ s) -> putStr s
     errs <- forM errors $ \e -> case e of
         ErrorMsg EErr place msg ->
             hPutStrLn stderr ("[" ++ place ++ "] \x1b[1;31merror\x1b[0m: " ++ msg)
