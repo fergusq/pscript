@@ -52,6 +52,21 @@ Void main() {
 4
 3
 ---
+### For statement
+Void main() {
+	for (i in [2..8]) {
+		println(i);
+	}
+}
+==>
+2
+3
+4
+5
+6
+7
+8
+---
 ### Squarable
 model Squarable { $ square(); }
 extend Int : Squarable { Int square() { return this*this; } }
@@ -336,4 +351,20 @@ Void main() {
 4
 9
 6
+---
+### Hash maps
+Void main() {
+	var map = createHashMap::<Str, Int>();
+	map.put("a", 1);
+	map.put("b", 2);
+	map.put("c", 3);
+	map.put("a", 2);
+	println(map.get("a").orElse(0));
+	println(map.get("b").orElse(0));
+	println(map.get("c").orElse(0));
+}
+==>
+2
+2
+3
 ---
