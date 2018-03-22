@@ -144,6 +144,9 @@ checktype v f right@(PInterface "Long" []) (PInterface "Int" []) =
 -- muunnos Float -> Int
 checktype v f right@(PInterface "Int" []) (PInterface "Float" []) =
     generateCreate right v f
+-- muunnis Char -> Int
+checktype v f right@(PInterface "Int" []) (PInterface "Char" []) =
+    generateCreate right v f
 -- muut muunnokset
 checktype v f right cand = do
     -- varmistetaan, että tyypin laajennokset on generoitu
