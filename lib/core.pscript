@@ -102,6 +102,28 @@ extend Array<@T> : Eq<Array<@T>> {
 	}
 }
 
+// HASH
+
+model HasHash {
+	Int hash();
+}
+
+extend Str : HasHash {
+	Int hash() {
+		var hash = 0;
+		for (i in [0 .. this.size()-1]) {
+			hash = hash * 31 + this[i];
+		}
+		return hash;
+	}
+}
+
+extend Int : HasHash {
+	Int hash() {
+		return this;
+	}
+}
+
 // SUMMABLE
 
 [doc("If all instances of a type
@@ -570,7 +592,7 @@ const struct Sort<@T> {}
 
 extend Sort<@T> : StreamOperation<@T, StreamSource<@T>> {
 	StreamSource<@T> operator |(StreamSource<@T> source) {
-		var list = source | new ArrayList<@T> { [] }.collect();
+		var list = source | createArrayList::<@T>().collect();
 		sortList(list);
 		return list;
 	}
@@ -807,18 +829,42 @@ model VariableSizeList<@T> : List<@T>, Stack<@T>, Queue<@T> {
 
 [doc("An array : mutable size.")]
 struct ArrayList<@T> {
-	@T[] elements;
+	@T* elements;
+	Int size;
+	Int allocated_size;
+}
+
+ArrayList<@T> createArrayList<@T>() {
+	return new ArrayList<@T> { new @T*(1), 0, 1 };
+}
+
+Void growArrayList<@T>(ArrayList<@T> list) {
+	var size = list.allocated_size*2;
+	var array = new @T*(size);
+	for (i in [0 .. list.size-1]) {
+		array[i] = list.elements[i];
+	}
+	list.elements = array;
+	list.allocated_size = size;
+}
+
+@T[] arrayListToArray<@T>(ArrayList<@T> list) {
+	return new Array<@T> { list.size, list.elements };
+}
+
+ArrayList<@T> arrayToArrayList<@T>(@T[] array) {
+	return new ArrayList<@T> { array.ptr, array.size(), array.size() };
 }
 
 extend ArrayList<@T> : HasSize {
 	Int size() {
-		return this.elements.size();
+		return this.size;
 	}
 }
 
 extend ArrayList<@T> : String {
 	Str toString() {
-		return "ArrayList { " ++ this.elements ++ " }";
+		return "ArrayList { " ++ arrayListToArray(this) ++ " }";
 	}
 }
 
@@ -833,7 +879,7 @@ extend ArrayList<@T> : Eq<ArrayList<@T>> {
 
 extend ArrayList<@T> : Container<@T> {
 	Bool contains(@T value) {
-		return this.elements.contains(value);
+		return arrayListToArray(this).contains(value);
 	}
 }
 
@@ -851,7 +897,12 @@ extend ArrayList<@T> : MutableList<@T> {
 
 extend ArrayList<@T> : Pushable<@T> {
 	Void push(@T value) {
-		this.elements = this.elements.append(value);
+		var len = this.size;
+		if (this.allocated_size <= len) {
+			growArrayList(this);
+		}
+		this.size = len + 1;
+		this.elements[len] = value;
 	}
 }
 
@@ -869,49 +920,45 @@ extend ArrayList<@T> : Queue<@T> {
 
 extend ArrayList<@T> : VariableSizeList<@T> {
 	Void add(Int index, @T value) {
-		var arr = new @T[this.size()+1];
-		var i = 0;
-		for (v in this.elements) {
-			if (i < index)
-				arr[i] = v;
-			else if (i == index) {
-				arr[i] = value;
-				arr[i+1] = v;
-			} else if (i > index)
-				arr[i+1] = v;
-			i = i + 1;
+		if (this.allocated_size <= this.size) {
+			growArrayList(this);
 		}
-		this.elements = arr;
+		var i = this.size-1;
+		this.size = this.size + 1;
+		while (i >= index) {
+			this.elements[i+1] = this.elements[i];
+			i = i - 1;
+		}
+		this.elements[index] = value;
 	}
 	@T remove(Int index) {
-		var t = this[index];
-		var arr = new @T[this.size()-1];
-		var i = 0;
-		for (v in this.elements) {
-			if (i < index)
-				arr[i] = v;
-			else if (i > index)
-				arr[i-1] = v;
-			i = i + 1;
+		var t = this.elements[index];
+		for (i in [index .. this.size - 2]) {
+			this.elements[i] = this.elements[i+1];
 		}
-		this.elements = arr;
+		this.size = this.size - 1;
 		return t;
 	}
 }
 
 extend ArrayList<@T> : Summable<ArrayList<@T>> {
 	ArrayList<@T> operator ++(ArrayList<@T> l) {
-		return new ArrayList<@T> { this.elements ++ l.elements };
+		var ans = createArrayList::<@T>();
+		for (a in arrayListToArray(this)) ans.push(a);
+		for (a in arrayListToArray(l)) ans.push(a);
+		return ans;
 	}
 	
 	ArrayList<@T> sumIdentity() {
-		return new ArrayList<@T> { this.elements.sumIdentity() };
+		return new ArrayList<@T> { new @T*(1), 0, 1 };
 	}
 }
 
 extend ArrayList<@T> : Appendable<@T> {
 	ArrayList<@T> append(@T value) {
-		return new ArrayList<@T> { this.elements.append(value) };
+		var ans = this.copy();
+		ans.push(value);
+		return ans;
 	}
 }
 
@@ -929,18 +976,72 @@ extend ArrayList<@T> : Collector<@T> {
 
 extend ArrayList<@T> : StreamSource<@T> {
 	Iterator<@T> iterator() {
-		return new ArrayIterator<@T> { this.elements, 0 };
+		return new ArrayIterator<@T> { arrayListToArray(this), 0 };
 	}
 }
 
 extend ArrayList<@T> : Copyable {
 	ArrayList<@T> copy() {
-		return new ArrayList<@T> { this.elements.copy() };
+		var ans = new ArrayList<@T> { new @T*(this.allocated_size), this.size, this.allocated_size };
+		for (i in [0 .. this.size]) ans.elements[i] = this.elements[i];
+		return ans;
 	}
 }
 
-ArrayList<@T> createArrayList<@T>() {
-	return new ArrayList<@T> { [] };
+// MAP
+
+model Map<@K, @V> : Container<@T> {
+	@V get(@K key);
+}
+
+model MutableMap<@K, @V> : Map<@K, @V> {
+	Void put(@K key, @V value);
+}
+
+// HASH MAP
+
+struct Pair<@K, @V> {
+	@K first;
+	@V second;
+}
+
+Pair<@K, @V> createPair<@K, @V>(@K first, @V second) {
+	return new Pair<@K, @V> { first, second };
+}
+
+struct HashMap<@K, @V> {
+	ArrayList<Pair<@K, @V>>[] buckets;
+}
+
+extend HashMap<@K, @V> : Map<@K, @V> {
+	@V get(@K key) {
+		var hash = key.hash();
+		var bucket = this.buckets[hash%this.buckets.size()];
+		for (pair in bucket) {
+			if (pair.first == key) {
+				return just(pair.second);
+			}
+		}
+		return nothing();
+	}
+}
+
+extend HashMap<@K, @V> : MutableMap<@K, @V> {
+	Void put(@K key, @V value) {
+		var hash = key.hash();
+		var bucket = this.buckets[hash%this.buckets.size()];
+		var found = false;
+		for (pair in bucket) {
+			if (pair.first == key) {
+				pair.second = value;
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			bucket.push(createPair(key, value));
+		}
+	}
 }
 
 // OPTIONAL
